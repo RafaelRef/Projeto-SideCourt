@@ -27,7 +27,6 @@ export async function getPlayers(teamId) {
     .from('players')
     .select('*')
     .eq('team_id', teamId)
-    .neq('active', false)
     .order('jersey_number', { ascending: true, nullsFirst: false });
   if (error) throw error;
   return data || [];

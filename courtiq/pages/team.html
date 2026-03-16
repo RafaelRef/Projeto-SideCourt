@@ -213,9 +213,13 @@
     }
 
     async function loadPlayers() {
-      players = await getPlayers(team.id);
-      document.getElementById('squad-count').textContent = `${players.length} atleta${players.length !== 1 ? 's' : ''}`;
-      renderPlayerList();
+      try {
+        players = await getPlayers(team.id);
+        document.getElementById('squad-count').textContent = `${players.length} atleta${players.length !== 1 ? 's' : ''}`;
+        renderPlayerList();
+      } catch (err) {
+        document.getElementById('player-list').innerHTML = `<div class="text-muted text-sm">Erro ao carregar atletas: ${err.message}</div>`;
+      }
     }
 
     function renderPlayerList() {
