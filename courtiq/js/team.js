@@ -27,7 +27,7 @@ export async function getPlayers(teamId) {
     .from('players')
     .select('*')
     .eq('team_id', teamId)
-    .eq('active', true)
+    .neq('active', false)
     .order('jersey_number', { ascending: true, nullsFirst: false });
   if (error) throw error;
   return data || [];
@@ -36,7 +36,7 @@ export async function getPlayers(teamId) {
 export async function createPlayer(teamId, { name, jersey_number, position }) {
   const { data, error } = await supabase
     .from('players')
-    .insert({ team_id: teamId, name, jersey_number: jersey_number || null, position: position || null })
+    .insert({ team_id: teamId, name, jersey_number: jersey_number || null, position: position || null, active: true })
     .select()
     .single();
   if (error) throw error;
