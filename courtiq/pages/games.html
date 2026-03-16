@@ -137,9 +137,11 @@
         scoreHtml = '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();goToInput(\'' + game.id + '\')">Iniciar</button>';
         onclick = `onclick="goToInput('${game.id}')"`;
       } else {
-        const score = game.our_score ?? '—';
-        const win = game.our_score != null && game.our_score > (game.opp_score || 0);
-        scoreHtml = `<div class="game-score ${win ? 'win' : 'loss'}">${score}</div>`;
+        const ourScore = game.our_score ?? '—';
+        const oppScore = game.opp_score ?? '—';
+        const win = game.our_score != null && game.opp_score != null && game.our_score > game.opp_score;
+        const scoreClass = game.our_score == null ? '' : win ? 'win' : 'loss';
+        scoreHtml = `<div class="game-score ${scoreClass}" style="font-size:1.3rem">${ourScore}<span style="color:var(--muted);font-size:1rem"> — </span>${oppScore}</div>`;
         onclick = `onclick="goToSummary('${game.id}')"`;
       }
 

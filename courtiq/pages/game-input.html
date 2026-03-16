@@ -420,6 +420,12 @@
       document.getElementById('opp-label').textContent = game.opponent.split(' ')[0];
       document.title = `CourtIQ — vs ${game.opponent}`;
 
+      // Restaurar placar do adversário se o jogo já havia sido salvo
+      if (game.opp_score != null) {
+        oppScore = game.opp_score;
+        document.getElementById('score-opp').textContent = oppScore;
+      }
+
       gamePlayers = await getGamePlayers(gameId);
       gameEvents = await getGameEvents(gameId);
 
