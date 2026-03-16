@@ -1,5 +1,11 @@
 import { supabase } from './supabase-client.js';
 
+// Detecta o caminho raiz relativo à página atual
+// Funciona tanto com file:// (local) quanto com servidor (Netlify)
+function rootPath() {
+  return window.location.pathname.includes('/pages/') ? '../' : './';
+}
+
 export async function signIn(email, password) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
@@ -19,13 +25,13 @@ export async function signOut() {
   localStorage.removeItem('currentTeamId');
   localStorage.removeItem('currentGameId');
   localStorage.removeItem('currentPlayerId');
-  window.location.href = '/index.html';
+  window.location.href = rootPath() + 'index.html';
 }
 
 export async function requireAuth() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
-    window.location.href = '/index.html';
+    window.location.href = rootPath() + 'index.html';
     return null;
   }
   localStorage.setItem('currentUserId', session.user.id);
@@ -40,6 +46,6 @@ export async function getCurrentUser() {
 export async function redirectIfLoggedIn() {
   const { data: { session } } = await supabase.auth.getSession();
   if (session) {
-    window.location.href = '/choose.html';
+    window.location.href = rootPath() + 'choose.html';
   }
 }
