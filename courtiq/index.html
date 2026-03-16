@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CourtIQ — Login</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .login-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .login-box {
+      width: 100%;
+      max-width: 380px;
+    }
+    .logo-area {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .logo {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 800;
+      font-size: 2.8rem;
+      letter-spacing: 0.02em;
+    }
+    .logo span { color: var(--accent); }
+    .logo-sub {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+    }
+    .login-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.75rem;
+    }
+    .login-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .login-tab {
+      flex: 1;
+      padding: 0.6rem;
+      text-align: center;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .login-tab.active {
+      color: var(--accent2);
+      border-bottom-color: var(--accent);
+    }
+    .form-stack { display: flex; flex-direction: column; gap: 1rem; }
+    .footer-text {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-box">
+      <div class="logo-area">
+        <div class="logo">Court<span>IQ</span></div>
+        <div class="logo-sub">Basquete universitário com dados</div>
+      </div>
+
+      <div class="login-card">
+        <div class="login-tabs">
+          <button class="login-tab active" id="tab-login" onclick="showTab('login')">Entrar</button>
+          <button class="login-tab" id="tab-signup" onclick="showTab('signup')">Cadastrar</button>
+        </div>
+
+        <!-- Formulário de Login -->
+        <div id="panel-login">
+          <form class="form-stack" id="form-login">
+            <div class="form-group">
+              <label class="form-label" for="login-email">E-mail</label>
+              <input class="input" type="email" id="login-email" placeholder="seu@email.com" required autocomplete="email" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="login-password">Senha</label>
+              <input class="input" type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password" />
+            </div>
+            <div class="form-error" id="login-error"></div>
+            <button class="btn btn-primary btn-full" type="submit" id="btn-login">Entrar</button>
+          </form>
+        </div>
+
+        <!-- Formulário de Cadastro -->
+        <div id="panel-signup" class="hidden">
+          <form class="form-stack" id="form-signup">
+            <div class="form-group">
+              <label class="form-label" for="signup-email">E-mail</label>
+              <input class="input" type="email" id="signup-email" placeholder="seu@email.com" required autocomplete="email" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="signup-password">Senha</label>
+              <input class="input" type="password" id="signup-password" placeholder="mínimo 6 caracteres" required autocomplete="new-password" minlength="6" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="signup-password2">Confirmar senha</label>
+              <input class="input" type="password" id="signup-password2" placeholder="••••••••" required autocomplete="new-password" />
+            </div>
+            <div class="form-error" id="signup-error"></div>
+            <div id="signup-success" class="hidden" style="color: var(--green); font-size: 0.85rem; text-align: center;"></div>
+            <button class="btn btn-primary btn-full" type="submit" id="btn-signup">Criar conta</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="footer-text">CourtIQ © 2026 — NDU &amp; JUBS</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { signIn, signUp, redirectIfLoggedIn } from './js/auth.js';
+    import { setLoading } from './js/utils.js';
+
+    redirectIfLoggedIn();
+
+    window.showTab = function(tab) {
+      document.getElementById('panel-login').classList.toggle('hidden', tab !== 'login');
+      document.getElementById('panel-signup').classList.toggle('hidden', tab !== 'signup');
+      document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+      document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
+    };
+
+    document.getElementById('form-login').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+      const errEl = document.getElementById('login-error');
+      const btn = document.getElementById('btn-login');
+      errEl.textContent = '';
+      setLoading(btn, true);
+      try {
+        await signIn(email, password);
+        window.location.href = 'choose.html';
+      } catch (err) {
+        errEl.textContent = 'E-mail ou senha incorretos.';
+        setLoading(btn, false);
+      }
+    });
+
+    document.getElementById('form-signup').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('signup-email').value;
+      const password = document.getElementById('signup-password').value;
+      const password2 = document.getElementById('signup-password2').value;
+      const errEl = document.getElementById('signup-error');
+      const successEl = document.getElementById('signup-success');
+      const btn = document.getElementById('btn-signup');
+      errEl.textContent = '';
+      successEl.classList.add('hidden');
+
+      if (password !== password2) {
+        errEl.textContent = 'As senhas não coincidem.';
+        return;
+      }
+      setLoading(btn, true);
+      try {
+        await signUp(email, password);
+        successEl.textContent = 'Conta criada! Verifique seu e-mail para confirmar.';
+        successEl.classList.remove('hidden');
+        setLoading(btn, false);
+      } catch (err) {
+        errEl.textContent = err.message || 'Erro ao criar conta.';
+        setLoading(btn, false);
+      }
+    });
+  </script>
+</body>
+</html>

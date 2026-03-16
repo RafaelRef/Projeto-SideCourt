@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CourtIQ — Novo Jogo</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .main { padding: 1.5rem 1.25rem; max-width: 640px; margin: 0 auto; }
+    .page-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 2rem; margin-bottom: 1.5rem; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .form-full { grid-column: 1 / -1; }
+    .squad-list { display: flex; flex-direction: column; gap: 0.4rem; }
+    .squad-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.55rem 0.75rem;
+      background: var(--bg3);
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .squad-row:hover { background: var(--border2); }
+    .squad-row input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+    .squad-row label { cursor: pointer; font-size: 0.9rem; flex: 1; }
+    .section-title {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+    @media (max-width: 480px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a class="navbar-logo" href="games.html">Court<span>IQ</span></a>
+    <div class="navbar-actions">
+      <a class="btn btn-ghost btn-sm" href="games.html">← Jogos</a>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="page-title">Novo Jogo</div>
+
+    <div class="card mb-3">
+      <div class="form-grid">
+        <div class="form-group form-full">
+          <label class="form-label">Adversário</label>
+          <input class="input" type="text" id="opponent" placeholder="Ex: FEI, Unifesp..." maxlength="60" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Data e horário</label>
+          <input class="input" type="datetime-local" id="date" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Local</label>
+          <input class="input" type="text" id="location" placeholder="Ginásio, endereço..." maxlength="80" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Campeonato</label>
+          <select class="select" id="tournament">
+            <option value="">Nenhum</option>
+            <option>NDU 17</option>
+            <option>JUBS 2026</option>
+            <option>Outro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mando de campo</label>
+          <select class="select" id="is_home">
+            <option value="true">Casa</option>
+            <option value="false">Fora</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Elenco do jogo</div>
+    <div class="card mb-3">
+      <div class="flex justify-between items-center mb-2">
+        <span class="text-muted text-sm" id="squad-count">Carregando...</span>
+        <button class="btn btn-ghost btn-sm" id="btn-toggle-all">Desmarcar todas</button>
+      </div>
+      <div class="squad-list" id="squad-list">
+        <div class="text-muted text-sm">Carregando atletas...</div>
+      </div>
+    </div>
+
+    <div class="form-error" id="form-error"></div>
+    <div class="flex gap-1 mt-2">
+      <button class="btn btn-primary" id="btn-save-start">Salvar e iniciar</button>
+      <button class="btn btn-ghost" id="btn-save-only">Salvar sem iniciar</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth } from '../js/auth.js';
+    import { getMyTeam, getPlayers } from '../js/team.js';
+    import { createGame, setGamePlayers } from '../js/games.js';
+    import { getInitials, setLoading, formatDateTimeLocal } from '../js/utils.js';
+
+    let players = [];
+    let allSelected = true;
+
+    async function init() {
+      const session = await requireAuth();
+      if (!session) return;
+
+      const team = await getMyTeam(session.user.id);
+      if (!team) { window.location.href = '../choose.html'; return; }
+      localStorage.setItem('currentTeamId', team.id);
+
+      players = await getPlayers(team.id);
+      renderSquad();
+
+      // Data padrão: agora
+      document.getElementById('date').value = formatDateTimeLocal(new Date());
+    }
+
+    function renderSquad() {
+      const list = document.getElementById('squad-list');
+      document.getElementById('squad-count').textContent = `${players.length} atleta${players.length !== 1 ? 's' : ''} disponíveis`;
+      if (players.length === 0) {
+        list.innerHTML = '<div class="text-muted text-sm">Nenhuma atleta cadastrada.</div>';
+        return;
+      }
+      list.innerHTML = players.map(p => `
+        <div class="squad-row" onclick="togglePlayer('${p.id}')">
+          <input type="checkbox" id="chk-${p.id}" checked />
+          <label for="chk-${p.id}">#${p.jersey_number ?? '—'} ${p.name} <span class="text-muted">${p.position || ''}</span></label>
+        </div>
+      `).join('');
+    }
+
+    window.togglePlayer = function(id) {
+      const chk = document.getElementById('chk-' + id);
+      if (chk) chk.checked = !chk.checked;
+    };
+
+    document.getElementById('btn-toggle-all').addEventListener('click', () => {
+      allSelected = !allSelected;
+      players.forEach(p => {
+        const chk = document.getElementById('chk-' + p.id);
+        if (chk) chk.checked = allSelected;
+      });
+      document.getElementById('btn-toggle-all').textContent = allSelected ? 'Desmarcar todas' : 'Marcar todas';
+    });
+
+    async function saveGame(andStart) {
+      const opponent = document.getElementById('opponent').value.trim();
+      const date = document.getElementById('date').value;
+      const errEl = document.getElementById('form-error');
+      errEl.textContent = '';
+      if (!opponent) { errEl.textContent = 'Informe o adversário.'; return; }
+      if (!date) { errEl.textContent = 'Informe a data.'; return; }
+
+      const teamId = localStorage.getItem('currentTeamId');
+      const selectedIds = players.filter(p => document.getElementById('chk-' + p.id)?.checked).map(p => p.id);
+      const btn = andStart ? document.getElementById('btn-save-start') : document.getElementById('btn-save-only');
+      setLoading(btn, true);
+
+      try {
+        const game = await createGame(teamId, {
+          opponent,
+          date: new Date(date).toISOString(),
+          location: document.getElementById('location').value.trim() || null,
+          is_home: document.getElementById('is_home').value === 'true',
+          tournament: document.getElementById('tournament').value || null,
+        });
+
+        await setGamePlayers(game.id, selectedIds);
+        localStorage.setItem('currentGameId', game.id);
+
+        if (andStart) {
+          window.location.href = `game-input.html?gameId=${game.id}`;
+        } else {
+          window.location.href = 'games.html';
+        }
+      } catch (err) {
+        errEl.textContent = err.message || 'Erro ao salvar jogo.';
+        setLoading(btn, false);
+      }
+    }
+
+    document.getElementById('btn-save-start').addEventListener('click', () => saveGame(true));
+    document.getElementById('btn-save-only').addEventListener('click', () => saveGame(false));
+
+    init();
+  </script>
+</body>
+</html>

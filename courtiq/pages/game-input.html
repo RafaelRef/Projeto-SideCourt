@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CourtIQ — Jogo ao Vivo</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    body { overflow-x: hidden; }
+
+    /* Header fixo */
+    .game-header {
+      position: sticky;
+      top: 56px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      z-index: 50;
+      padding: 0.6rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .game-header-info { display: flex; align-items: center; gap: 1rem; }
+    .live-badge { background: #7f1d1d; color: var(--red); font-size: 0.7rem; font-weight: 700; text-transform: uppercase; padding: 0.15rem 0.5rem; border-radius: 4px; letter-spacing: 0.06em; }
+    .game-score { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.6rem; }
+    .game-vs { color: var(--muted); font-size: 0.8rem; }
+    .game-header-right { display: flex; align-items: center; gap: 0.5rem; }
+
+    /* Layout 3 colunas */
+    .game-body {
+      display: grid;
+      grid-template-columns: 190px 1fr 270px;
+      gap: 0;
+      height: calc(100vh - 112px);
+      overflow: hidden;
+    }
+
+    /* Coluna 1 — Sidebar atletas */
+    .player-sidebar {
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 0.75rem 0.5rem;
+    }
+    .sidebar-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 0 0.5rem; margin-bottom: 0.5rem; }
+    .sidebar-player {
+      display: flex;
+      flex-direction: column;
+      padding: 0.5rem;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      margin-bottom: 0.25rem;
+      transition: border-color 0.12s, background 0.12s;
+    }
+    .sidebar-player:hover { background: var(--bg3); }
+    .sidebar-player.selected { border-color: var(--accent); background: #0f1e38; }
+    .sidebar-player-name { font-size: 0.82rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sidebar-player-num { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 0.9rem; color: var(--accent); }
+    .sidebar-mini-stats { display: flex; gap: 0.4rem; margin-top: 0.2rem; font-size: 0.7rem; color: var(--muted); }
+
+    /* Coluna 2 — Botões de stat */
+    .stat-panel {
+      overflow-y: auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .stat-section-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+    .stat-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .stat-buttons-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.4rem; }
+    .selected-player-label {
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent2);
+    }
+    .no-player-warn {
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    /* Coluna 3 — Shot chart */
+    .shotchart-panel {
+      background: var(--bg2);
+      border-left: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .sc-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+    .sc-svg { border-radius: 8px; border: 1px solid var(--border); width: 100%; }
+    .sc-filters { display: flex; gap: 0.3rem; }
+    .sc-filter-btn {
+      padding: 0.2rem 0.55rem;
+      border-radius: 5px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .sc-filter-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent2); }
+    .sc-stats { display: flex; gap: 0.75rem; font-size: 0.75rem; }
+    .sc-stat { color: var(--muted); }
+    .sc-stat strong { color: var(--text); }
+
+    /* Responsividade tablet */
+    @media (max-width: 768px) {
+      .game-body { grid-template-columns: 160px 1fr; grid-template-rows: 1fr auto; height: auto; overflow: auto; }
+      .shotchart-panel { grid-column: 1 / -1; border-left: none; border-top: 1px solid var(--border); }
+    }
+
+    /* Responsividade mobile */
+    @media (max-width: 480px) {
+      .game-body { grid-template-columns: 1fr; grid-template-rows: auto; height: auto; }
+      .player-sidebar { border-right: none; border-bottom: 1px solid var(--border); max-height: 80px; overflow: hidden; }
+      .player-sidebar.expanded { max-height: none; }
+      .sidebar-toggle { display: block !important; }
+      .stat-buttons { grid-template-columns: 1fr 1fr; }
+      .shotchart-panel { border-left: none; border-top: 1px solid var(--border); }
+      .game-header { top: 56px; }
+    }
+
+    .sidebar-toggle { display: none; width: 100%; margin-bottom: 0.4rem; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a class="navbar-logo" href="games.html">Court<span>IQ</span></a>
+  </nav>
+
+  <!-- Header fixo com placar -->
+  <div class="game-header">
+    <div class="game-header-info">
+      <span class="live-badge">● AO VIVO</span>
+      <div>
+        <div class="game-vs" id="game-vs">vs —</div>
+        <div class="game-score" id="game-score">0 — 0</div>
+      </div>
+    </div>
+    <div class="game-header-right">
+      <div class="quarter-selector" id="quarter-selector">
+        <button class="quarter-btn active" onclick="setQuarter(1)">1Q</button>
+        <button class="quarter-btn" onclick="setQuarter(2)">2Q</button>
+        <button class="quarter-btn" onclick="setQuarter(3)">3Q</button>
+        <button class="quarter-btn" onclick="setQuarter(4)">4Q</button>
+      </div>
+      <button class="btn btn-danger btn-sm" id="btn-end-game">Encerrar jogo</button>
+    </div>
+  </div>
+
+  <!-- Banner shot chart -->
+  <div class="shot-banner" id="shot-banner" style="margin:0.5rem 1rem 0">
+    🎯 Clique na quadra para marcar o local do arremesso
+    <button style="margin-left:auto;font-size:0.8rem;color:var(--muted);background:none;border:none;cursor:pointer" onclick="cancelShot()">Cancelar</button>
+  </div>
+
+  <!-- Layout 3 colunas -->
+  <div class="game-body">
+
+    <!-- Coluna 1: Atletas -->
+    <div class="player-sidebar" id="player-sidebar">
+      <button class="sidebar-toggle btn btn-ghost btn-sm" id="sidebar-toggle-btn" onclick="toggleSidebar()">Atletas ▾</button>
+      <div class="sidebar-title">Selecione a atleta</div>
+      <div id="sidebar-players"></div>
+    </div>
+
+    <!-- Coluna 2: Botões de stat -->
+    <div class="stat-panel">
+      <div id="selected-label" class="no-player-warn">Selecione uma atleta ao lado para registrar eventos.</div>
+
+      <!-- Arremessos -->
+      <div>
+        <div class="stat-section-title">Arremessos — clique e marque na quadra</div>
+        <div class="stat-buttons">
+          <button class="stat-btn stat-btn-green" onclick="triggerShot('2pt_made')">2 PTS ✓</button>
+          <button class="stat-btn stat-btn-red"   onclick="triggerShot('2pt_miss')">2 PTS ✗</button>
+          <button class="stat-btn stat-btn-green" onclick="triggerShot('3pt_made')">3 PTS ✓</button>
+          <button class="stat-btn stat-btn-red"   onclick="triggerShot('3pt_miss')">3 PTS ✗</button>
+          <button class="stat-btn stat-btn-green" onclick="registerEvent('ft_made')">Lance livre ✓</button>
+          <button class="stat-btn stat-btn-red"   onclick="registerEvent('ft_miss')">Lance livre ✗</button>
+        </div>
+      </div>
+
+      <!-- Outros -->
+      <div>
+        <div class="stat-section-title">Outros</div>
+        <div class="stat-buttons-3">
+          <button class="stat-btn stat-btn-ghost" onclick="registerEvent('reb_def')">Reb. def.</button>
+          <button class="stat-btn stat-btn-ghost" onclick="registerEvent('reb_off')">Reb. of.</button>
+          <button class="stat-btn stat-btn-ghost" onclick="registerEvent('ast')">Assistência</button>
+          <button class="stat-btn stat-btn-ghost" onclick="registerEvent('stl')">Roubo</button>
+          <button class="stat-btn stat-btn-ghost" onclick="registerEvent('blk')">Toco</button>
+          <button class="stat-btn stat-btn-ghost" onclick="registerEvent('to')">Erro</button>
+        </div>
+        <div class="mt-1">
+          <button class="stat-btn stat-btn-yellow" style="width:100%" onclick="registerEvent('foul')">⚠️ Falta</button>
+        </div>
+      </div>
+
+      <!-- Desfazer último evento -->
+      <button class="btn btn-ghost btn-sm" id="btn-undo" style="width:fit-content;align-self:flex-start" onclick="undoLast()">↩ Desfazer último</button>
+    </div>
+
+    <!-- Coluna 3: Shot chart -->
+    <div class="shotchart-panel">
+      <div class="sc-title">Shot chart — ao vivo</div>
+      <div class="sc-filters">
+        <button class="sc-filter-btn active" onclick="setSCFilter('all')">Todos</button>
+        <button class="sc-filter-btn" onclick="setSCFilter('made')">Certos</button>
+        <button class="sc-filter-btn" onclick="setSCFilter('missed')">Errados</button>
+      </div>
+      <svg class="sc-svg" id="sc-svg" viewBox="0 0 560 300"></svg>
+      <div class="sc-stats">
+        <div class="sc-stat">Total: <strong id="sc-total">0</strong></div>
+        <div class="sc-stat">Certos: <strong id="sc-made" style="color:var(--green)">0</strong></div>
+        <div class="sc-stat">Errados: <strong id="sc-missed" style="color:var(--red)">0</strong></div>
+        <div class="sc-stat">FG%: <strong id="sc-pct">0%</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth } from '../js/auth.js';
+    import { getGame, getGamePlayers, updateGameStatus, updateGame } from '../js/games.js';
+    import { createEvent, getGameEvents, deleteEvent } from '../js/events.js';
+    import { calcPlayerStats } from '../js/stats.js';
+    import { initShotChart, activateShotMode, deactivateShotMode, addShot, renderShots, getShotStats } from '../js/shotchart.js';
+    import { getQueryParam, getInitials, showToast } from '../js/utils.js';
+
+    const gameId = getQueryParam('gameId') || localStorage.getItem('currentGameId');
+    let game = null;
+    let gamePlayers = [];
+    let selectedPlayerId = null;
+    let currentQuarter = 1;
+    let pendingEventType = null;
+    let gameEvents = [];
+    let scFilter = 'all';
+    const svgEl = document.getElementById('sc-svg');
+
+    window.setQuarter = function(q) {
+      currentQuarter = q;
+      document.querySelectorAll('.quarter-btn').forEach((b, i) => b.classList.toggle('active', i+1 === q));
+    };
+
+    window.toggleSidebar = function() {
+      const sb = document.getElementById('player-sidebar');
+      sb.classList.toggle('expanded');
+      document.getElementById('sidebar-toggle-btn').textContent = sb.classList.contains('expanded') ? 'Atletas ▴' : 'Atletas ▾';
+    };
+
+    function selectPlayer(id) {
+      selectedPlayerId = id;
+      document.querySelectorAll('.sidebar-player').forEach(el => el.classList.toggle('selected', el.dataset.id === id));
+      const p = gamePlayers.find(p => p.id === id);
+      if (p) {
+        document.getElementById('selected-label').className = 'selected-player-label';
+        document.getElementById('selected-label').textContent = `#${p.jersey_number ?? '—'} ${p.name}`;
+      }
+      updateSCStats();
+    }
+
+    window.triggerShot = function(type) {
+      if (!selectedPlayerId) { showToast('Selecione uma atleta primeiro.', 'error'); return; }
+      pendingEventType = type;
+      document.getElementById('shot-banner').classList.add('active');
+      activateShotMode(svgEl);
+    };
+
+    window.cancelShot = function() {
+      pendingEventType = null;
+      document.getElementById('shot-banner').classList.remove('active');
+      deactivateShotMode(svgEl);
+    };
+
+    window.registerEvent = async function(type, shotX = null, shotY = null) {
+      if (!selectedPlayerId) { showToast('Selecione uma atleta primeiro.', 'error'); return; }
+      try {
+        const ev = await createEvent(gameId, selectedPlayerId, type, currentQuarter, shotX, shotY);
+        gameEvents.push(ev);
+        updateScoreboard();
+        updateSidebarStats();
+        if (shotX != null) {
+          addShot(svgEl, ev);
+          updateSCStats();
+        }
+      } catch (err) {
+        showToast('Erro ao registrar evento.', 'error');
+      }
+    };
+
+    window.undoLast = async function() {
+      const last = gameEvents.at(-1);
+      if (!last) return;
+      if (!confirm('Remover o último evento registrado?')) return;
+      try {
+        await deleteEvent(last.id);
+        gameEvents.pop();
+        updateScoreboard();
+        updateSidebarStats();
+        const shots = gameEvents.filter(e => e.shot_x != null);
+        renderShots(svgEl, shots, scFilter, selectedPlayerId);
+        updateSCStats();
+        showToast('Evento removido.', '');
+      } catch (err) {
+        showToast('Erro ao desfazer.', 'error');
+      }
+    };
+
+    window.setSCFilter = function(f) {
+      scFilter = f;
+      document.querySelectorAll('.sc-filter-btn').forEach((b, i) => b.classList.toggle('active', ['all','made','missed'][i] === f));
+      const shots = gameEvents.filter(e => e.shot_x != null);
+      renderShots(svgEl, shots, f, selectedPlayerId);
+      updateSCStats();
+    };
+
+    function updateScoreboard() {
+      const pts = calcPlayerStats(gameEvents).pts;
+      document.getElementById('game-score').textContent = `${pts} — ?`;
+    }
+
+    function updateSidebarStats() {
+      gamePlayers.forEach(p => {
+        const el = document.getElementById(`mini-${p.id}`);
+        if (!el) return;
+        const evs = gameEvents.filter(e => e.player_id === p.id);
+        const st = calcPlayerStats(evs);
+        el.textContent = `${st.pts}pts ${st.reb}reb ${st.ast}ast`;
+      });
+    }
+
+    function updateSCStats() {
+      const shots = gameEvents.filter(e => e.shot_x != null);
+      const st = getShotStats(shots, selectedPlayerId);
+      document.getElementById('sc-total').textContent = st.total;
+      document.getElementById('sc-made').textContent = st.made;
+      document.getElementById('sc-missed').textContent = st.missed;
+      document.getElementById('sc-pct').textContent = st.pct;
+    }
+
+    function renderSidebarPlayers() {
+      const el = document.getElementById('sidebar-players');
+      el.innerHTML = gamePlayers.map(p => `
+        <div class="sidebar-player" data-id="${p.id}" onclick="selectPlayer('${p.id}')">
+          <div class="flex items-center gap-1">
+            <span class="sidebar-player-num">#${p.jersey_number ?? '—'}</span>
+            <span class="sidebar-player-name">${p.name}</span>
+          </div>
+          <div class="sidebar-mini-stats" id="mini-${p.id}">0pts 0reb 0ast</div>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('btn-end-game').addEventListener('click', async () => {
+      if (!confirm('Encerrar o jogo?')) return;
+      try {
+        await updateGameStatus(gameId, 'finished');
+        window.location.href = `game-summary.html?gameId=${gameId}`;
+      } catch (err) {
+        showToast('Erro ao encerrar jogo.', 'error');
+      }
+    });
+
+    async function init() {
+      const session = await requireAuth();
+      if (!session) return;
+      if (!gameId) { window.location.href = 'games.html'; return; }
+
+      game = await getGame(gameId);
+      if (!game) { window.location.href = 'games.html'; return; }
+
+      // Iniciar jogo se ainda agendado
+      if (game.status === 'scheduled') {
+        await updateGameStatus(gameId, 'live');
+      }
+      if (game.status === 'finished') {
+        window.location.href = `game-summary.html?gameId=${gameId}`;
+        return;
+      }
+
+      document.getElementById('game-vs').textContent = `vs ${game.opponent}`;
+      document.title = `CourtIQ — vs ${game.opponent}`;
+
+      gamePlayers = await getGamePlayers(gameId);
+      gameEvents = await getGameEvents(gameId);
+
+      renderSidebarPlayers();
+      updateScoreboard();
+      updateSidebarStats();
+
+      // Inicializar shot chart
+      initShotChart(svgEl, async (x, y) => {
+        document.getElementById('shot-banner').classList.remove('active');
+        await registerEvent(pendingEventType, x, y);
+        pendingEventType = null;
+      });
+
+      // Renderizar arremessos existentes
+      const shots = gameEvents.filter(e => e.shot_x != null);
+      renderShots(svgEl, shots, scFilter, selectedPlayerId);
+      updateSCStats();
+
+      // Selecionar primeira atleta automaticamente
+      if (gamePlayers.length > 0) selectPlayer(gamePlayers[0].id);
+    }
+
+    // Expor funções ao escopo global
+    window.selectPlayer = selectPlayer;
+
+    init();
+  </script>
+</body>
+</html>

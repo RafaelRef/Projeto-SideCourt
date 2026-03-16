@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CourtIQ — Explorar</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .main { padding: 1.5rem 1.25rem; max-width: 900px; margin: 0 auto; }
+    .page-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 2rem; margin-bottom: 0.3rem; }
+    .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .filter-pill {
+      padding: 0.3rem 0.9rem;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      color: var(--muted);
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .filter-pill.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent2); }
+    .rank { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.2rem; color: var(--muted); }
+    .rank.gold   { color: #fbbf24; }
+    .rank.silver { color: #94a3b8; }
+    .rank.bronze { color: #c07a3f; }
+    .team-name-cell { font-weight: 600; }
+    .record-cell { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; }
+    .win  { color: var(--green); }
+    .loss { color: var(--red); }
+    .empty-state { text-align: center; padding: 3rem 1rem; color: var(--muted); }
+    .empty-icon { font-size: 3rem; margin-bottom: 0.75rem; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a class="navbar-logo" href="../choose.html">Court<span>IQ</span></a>
+    <div class="navbar-actions">
+      <a class="btn btn-ghost btn-sm" href="../choose.html">← Início</a>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="page-title">Explorar Times</div>
+    <p class="text-muted text-sm mb-3">Classificação e estatísticas de outros times que usam CourtIQ.</p>
+
+    <div class="filter-bar">
+      <button class="filter-pill active" onclick="setFilter('')">Todos</button>
+      <button class="filter-pill" onclick="setFilter('NDU 17')">NDU 17</button>
+      <button class="filter-pill" onclick="setFilter('JUBS 2026')">JUBS 2026</button>
+    </div>
+
+    <div id="table-wrap" class="table-wrap">
+      <div class="text-muted text-sm">Carregando...</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth } from '../js/auth.js';
+    import { supabase } from '../js/supabase-client.js';
+    import { calcTeamScore } from '../js/stats.js';
+
+    let allTeams = [];
+    let allGames = [];
+    let currentFilter = '';
+
+    window.setFilter = function(f) {
+      currentFilter = f;
+      document.querySelectorAll('.filter-pill').forEach((b, i) => {
+        b.classList.toggle('active', ['',' NDU 17','JUBS 2026'][i] === f || b.textContent.trim() === (f || 'Todos'));
+      });
+      renderTable();
+    };
+
+    function renderTable() {
+      const wrap = document.getElementById('table-wrap');
+      const games = currentFilter
+        ? allGames.filter(g => g.tournament === currentFilter && g.status === 'finished')
+        : allGames.filter(g => g.status === 'finished');
+
+      if (allTeams.length === 0) {
+        wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">🏀</div><p>Nenhum time cadastrado ainda.</p></div>`;
+        return;
+      }
+
+      // Agregar por time
+      const teamStats = allTeams.map(team => {
+        const teamGames = games.filter(g => g.team_id === team.id);
+        const wins = teamGames.filter(g => (g.our_score || 0) > 0).length; // simplificado: conta jogos finalizados
+        const losses = teamGames.length - wins;
+        const avgPts = teamGames.length > 0
+          ? Math.round(teamGames.reduce((a, g) => a + (g.our_score || 0), 0) / teamGames.length)
+          : 0;
+        return { team, played: teamGames.length, wins, losses, avgPts };
+      }).sort((a, b) => b.wins - a.wins || b.avgPts - a.avgPts);
+
+      if (teamStats.every(t => t.played === 0)) {
+        wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><p>Nenhum jogo registrado${currentFilter ? ' em ' + currentFilter : ''}.</p></div>`;
+        return;
+      }
+
+      wrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Time</th>
+              <th>J</th>
+              <th>V</th>
+              <th>D</th>
+              <th>PTS/j</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${teamStats.map((row, i) => `
+              <tr>
+                <td><span class="rank ${i===0?'gold':i===1?'silver':i===2?'bronze':''}">${i+1}</span></td>
+                <td class="team-name-cell">${row.team.name}</td>
+                <td>${row.played}</td>
+                <td class="record-cell win">${row.wins}</td>
+                <td class="record-cell loss">${row.losses}</td>
+                <td>${row.avgPts || '—'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    async function init() {
+      const session = await requireAuth();
+      if (!session) return;
+
+      // Buscar todos os times (dados públicos)
+      const { data: teams } = await supabase.from('teams').select('id, name').order('name');
+      allTeams = teams || [];
+
+      // Buscar jogos finalizados
+      const { data: games } = await supabase
+        .from('games')
+        .select('id, team_id, opponent, date, tournament, status, our_score, opp_score')
+        .eq('status', 'finished')
+        .order('date', { ascending: false });
+      allGames = games || [];
+
+      renderTable();
+    }
+
+    init();
+  </script>
+</body>
+</html>

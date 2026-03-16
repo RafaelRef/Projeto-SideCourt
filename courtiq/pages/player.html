@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CourtIQ — Atleta</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .main { padding: 1.25rem; max-width: 900px; margin: 0 auto; }
+    .player-header {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      padding: 1.25rem;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 1.5rem;
+    }
+    .player-big-avatar {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: var(--accent-dim);
+      border: 3px solid var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 800; font-size: 1.6rem;
+      color: var(--accent2);
+      flex-shrink: 0;
+    }
+    .player-meta { flex: 1; }
+    .player-full-name { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.8rem; line-height: 1; }
+    .player-detail { color: var(--muted); font-size: 0.88rem; margin-top: 0.25rem; }
+
+    /* Shot chart */
+    .shotchart-wrap { position: relative; }
+    .shotchart-svg { width: 100%; border-radius: 10px; border: 1px solid var(--border); }
+    .shot-filters { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; }
+    .filter-btn {
+      padding: 0.25rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .filter-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent2); }
+    .shot-stats-row { display: flex; gap: 1rem; margin-top: 0.5rem; font-size: 0.82rem; }
+    .shot-stat { color: var(--muted); }
+    .shot-stat strong { color: var(--text); }
+
+    /* Input manual */
+    .manual-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .manual-pair { display: flex; gap: 0.4rem; align-items: center; }
+    .manual-pair span { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+    .manual-pair .input { width: 56px; flex-shrink: 0; text-align: center; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a class="navbar-logo" href="team.html">Court<span>IQ</span></a>
+    <div class="navbar-actions">
+      <a class="btn btn-ghost btn-sm" href="team.html">← Elenco</a>
+    </div>
+  </nav>
+
+  <div class="main">
+    <!-- Header da atleta -->
+    <div class="player-header">
+      <div class="player-big-avatar" id="player-avatar">?</div>
+      <div class="player-meta">
+        <div class="player-full-name" id="player-name">Carregando...</div>
+        <div class="player-detail" id="player-detail"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btn-manual-toggle">+ Inserir stats</button>
+    </div>
+
+    <!-- Cards de médias -->
+    <div class="stats-grid mb-3">
+      <div class="stat-card"><div class="value" id="avg-pts">—</div><div class="label">PTS/j</div></div>
+      <div class="stat-card"><div class="value" id="avg-reb">—</div><div class="label">REB/j</div></div>
+      <div class="stat-card"><div class="value" id="avg-ast">—</div><div class="label">AST/j</div></div>
+      <div class="stat-card"><div class="value" id="avg-fg">—</div><div class="label">FG%</div></div>
+    </div>
+
+    <!-- Abas -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="setTab('history')">Histórico</button>
+      <button class="tab-btn" onclick="setTab('shotchart')">Mapa de arremessos</button>
+    </div>
+
+    <!-- Histórico -->
+    <div class="tab-panel active" id="tab-history">
+      <div class="table-wrap">
+        <table id="history-table">
+          <thead>
+            <tr>
+              <th>Jogo</th><th>PTS</th><th>REB</th><th>AST</th><th>ROB</th><th>TOC</th><th>ERR</th><th>FAL</th><th>FG%</th><th>3P%</th><th>LL%</th>
+            </tr>
+          </thead>
+          <tbody id="history-body">
+            <tr><td colspan="11" class="text-muted">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Shot chart -->
+    <div class="tab-panel" id="tab-shotchart">
+      <div class="shot-filters">
+        <button class="filter-btn active" onclick="setFilter('all')">Todos</button>
+        <button class="filter-btn" onclick="setFilter('made')">Certos</button>
+        <button class="filter-btn" onclick="setFilter('missed')">Errados</button>
+      </div>
+      <div class="shotchart-wrap">
+        <svg class="shotchart-svg" id="shotchart-svg" viewBox="0 0 560 300"></svg>
+      </div>
+      <div class="shot-stats-row">
+        <div class="shot-stat">Total: <strong id="sc-total">0</strong></div>
+        <div class="shot-stat">Certos: <strong id="sc-made" style="color:var(--green)">0</strong></div>
+        <div class="shot-stat">Errados: <strong id="sc-missed" style="color:var(--red)">0</strong></div>
+        <div class="shot-stat">FG%: <strong id="sc-pct">0%</strong></div>
+      </div>
+    </div>
+
+    <!-- Input manual (oculto por padrão) -->
+    <div class="hidden mt-3" id="manual-section">
+      <div class="card">
+        <div class="card-title">Inserir stats manualmente</div>
+        <div class="form-group mb-2">
+          <label class="form-label">Jogo</label>
+          <select class="select" id="manual-game-select"><option>Carregando...</option></select>
+        </div>
+        <div class="manual-grid">
+          <div>
+            <div class="form-label mb-1">2PT certos / tent.</div>
+            <div class="manual-pair">
+              <input class="input" type="number" id="m-2pt-made" value="0" min="0" />
+              <span>/</span>
+              <input class="input" type="number" id="m-2pt-att" value="0" min="0" />
+            </div>
+          </div>
+          <div>
+            <div class="form-label mb-1">3PT certos / tent.</div>
+            <div class="manual-pair">
+              <input class="input" type="number" id="m-3pt-made" value="0" min="0" />
+              <span>/</span>
+              <input class="input" type="number" id="m-3pt-att" value="0" min="0" />
+            </div>
+          </div>
+          <div>
+            <div class="form-label mb-1">LL certos / tent.</div>
+            <div class="manual-pair">
+              <input class="input" type="number" id="m-ft-made" value="0" min="0" />
+              <span>/</span>
+              <input class="input" type="number" id="m-ft-att" value="0" min="0" />
+            </div>
+          </div>
+          <div>
+            <div class="form-label mb-1">REB def. / of.</div>
+            <div class="manual-pair">
+              <input class="input" type="number" id="m-reb-def" value="0" min="0" />
+              <span>/</span>
+              <input class="input" type="number" id="m-reb-off" value="0" min="0" />
+            </div>
+          </div>
+          <div>
+            <div class="form-label mb-1">AST / ROB / TOC</div>
+            <div class="manual-pair">
+              <input class="input" type="number" id="m-ast" value="0" min="0" />
+              <input class="input" type="number" id="m-stl" value="0" min="0" />
+              <input class="input" type="number" id="m-blk" value="0" min="0" />
+            </div>
+          </div>
+          <div>
+            <div class="form-label mb-1">ERR / FAL</div>
+            <div class="manual-pair">
+              <input class="input" type="number" id="m-to" value="0" min="0" />
+              <input class="input" type="number" id="m-foul" value="0" min="0" />
+            </div>
+          </div>
+        </div>
+        <div class="form-error" id="manual-error"></div>
+        <div class="mt-2">
+          <button class="btn btn-primary" id="btn-save-manual">Salvar stats</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth } from '../js/auth.js';
+    import { getPlayers } from '../js/team.js';
+    import { getGames } from '../js/games.js';
+    import { getPlayerEvents, createEvent } from '../js/events.js';
+    import { calcPlayerStats, calcPlayerAverages } from '../js/stats.js';
+    import { getInitials, getQueryParam, pct, formatDate, showToast, setLoading } from '../js/utils.js';
+    import { initShotChart, renderShots, getShotStats } from '../js/shotchart.js';
+
+    const playerId = getQueryParam('id') || localStorage.getItem('currentPlayerId');
+    let player = null;
+    let allEvents = [];
+    let shotFilter = 'all';
+
+    window.setTab = function(name) {
+      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', ['history','shotchart'][i] === name);
+      });
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      if (name === 'shotchart') renderChart();
+    };
+
+    window.setFilter = function(f) {
+      shotFilter = f;
+      document.querySelectorAll('.filter-btn').forEach((b, i) => {
+        b.classList.toggle('active', ['all','made','missed'][i] === f);
+      });
+      renderChart();
+    };
+
+    async function init() {
+      const session = await requireAuth();
+      if (!session) return;
+      if (!playerId) { window.location.href = 'team.html'; return; }
+
+      const teamId = localStorage.getItem('currentTeamId');
+      const players = await getPlayers(teamId);
+      player = players.find(p => p.id === playerId);
+      if (!player) { window.location.href = 'team.html'; return; }
+
+      document.title = `CourtIQ — ${player.name}`;
+      document.getElementById('player-avatar').textContent = getInitials(player.name);
+      document.getElementById('player-name').textContent = player.name;
+      document.getElementById('player-detail').textContent =
+        `#${player.jersey_number ?? '—'} · ${player.position || 'Posição não definida'}`;
+
+      // Carregar todos os eventos da atleta
+      allEvents = await getPlayerEvents(playerId);
+
+      // Agrupar por jogo para médias
+      const byGame = {};
+      allEvents.forEach(e => {
+        if (!byGame[e.game_id]) byGame[e.game_id] = [];
+        byGame[e.game_id].push(e);
+      });
+
+      const avgs = calcPlayerAverages(byGame);
+      if (avgs) {
+        document.getElementById('avg-pts').textContent = avgs.pts;
+        document.getElementById('avg-reb').textContent = avgs.reb;
+        document.getElementById('avg-ast').textContent = avgs.ast;
+        document.getElementById('avg-fg').textContent = avgs.fgPct + '%';
+      }
+
+      await loadHistory(byGame);
+      await loadManualGames(teamId);
+
+      initShotChart(document.getElementById('shotchart-svg'));
+    }
+
+    async function loadHistory(byGame) {
+      const tbody = document.getElementById('history-body');
+      const gameIds = Object.keys(byGame);
+      if (gameIds.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" class="text-muted">Sem jogos registrados.</td></tr>';
+        return;
+      }
+
+      const teamId = localStorage.getItem('currentTeamId');
+      const games = await getGames(teamId);
+      const gameMap = Object.fromEntries(games.map(g => [g.id, g]));
+
+      tbody.innerHTML = gameIds.map(gid => {
+        const game = gameMap[gid];
+        const label = game ? `${formatDate(game.date)} vs ${game.opponent}` : gid.slice(0,8);
+        const st = calcPlayerStats(byGame[gid]);
+        return `<tr>
+          <td>${label}</td>
+          <td class="num">${st.pts}</td>
+          <td>${st.reb}</td>
+          <td>${st.ast}</td>
+          <td>${st.stl}</td>
+          <td>${st.blk}</td>
+          <td>${st.to}</td>
+          <td>${st.foul}</td>
+          <td>${pct(st.fgMade, st.fgAtt)}</td>
+          <td>${pct(st.threeMade, st.threeAtt)}</td>
+          <td>${pct(st.ftMade, st.ftAtt)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderChart() {
+      const svg = document.getElementById('shotchart-svg');
+      const shots = allEvents.filter(e => e.shot_x != null);
+      renderShots(svg, shots, shotFilter, playerId);
+      const st = getShotStats(shots, playerId);
+      document.getElementById('sc-total').textContent = st.total;
+      document.getElementById('sc-made').textContent = st.made;
+      document.getElementById('sc-missed').textContent = st.missed;
+      document.getElementById('sc-pct').textContent = st.pct;
+    }
+
+    async function loadManualGames(teamId) {
+      const games = await getGames(teamId);
+      const select = document.getElementById('manual-game-select');
+      select.innerHTML = games.length === 0
+        ? '<option>Nenhum jogo cadastrado</option>'
+        : games.map(g => `<option value="${g.id}">${formatDate(g.date)} vs ${g.opponent}</option>`).join('');
+    }
+
+    document.getElementById('btn-manual-toggle').addEventListener('click', () => {
+      document.getElementById('manual-section').classList.toggle('hidden');
+    });
+
+    document.getElementById('btn-save-manual').addEventListener('click', async () => {
+      const gameId = document.getElementById('manual-game-select').value;
+      const errEl = document.getElementById('manual-error');
+      const btn = document.getElementById('btn-save-manual');
+      errEl.textContent = '';
+
+      const get = id => parseInt(document.getElementById(id).value) || 0;
+      const events = [];
+      const push = (type, count) => { for (let i=0;i<count;i++) events.push(type); };
+
+      push('2pt_made', get('m-2pt-made'));
+      push('2pt_miss', get('m-2pt-att') - get('m-2pt-made'));
+      push('3pt_made', get('m-3pt-made'));
+      push('3pt_miss', get('m-3pt-att') - get('m-3pt-made'));
+      push('ft_made',  get('m-ft-made'));
+      push('ft_miss',  get('m-ft-att')  - get('m-ft-made'));
+      push('reb_def',  get('m-reb-def'));
+      push('reb_off',  get('m-reb-off'));
+      push('ast',  get('m-ast'));
+      push('stl',  get('m-stl'));
+      push('blk',  get('m-blk'));
+      push('to',   get('m-to'));
+      push('foul', get('m-foul'));
+
+      const invalid = events.filter(t => t.endsWith('miss') && t.includes('-1'));
+      if (events.some(t => false)) { errEl.textContent = 'Valores inválidos.'; return; }
+
+      setLoading(btn, true);
+      try {
+        for (const type of events) {
+          await createEvent(gameId, playerId, type, 1, null, null);
+        }
+        showToast('Stats salvas!', 'success');
+        allEvents = await getPlayerEvents(playerId);
+        document.getElementById('manual-section').classList.add('hidden');
+      } catch (err) {
+        errEl.textContent = err.message || 'Erro ao salvar.';
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

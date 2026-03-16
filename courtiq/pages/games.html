@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CourtIQ — Jogos</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .main { padding: 1.5rem 1.25rem; max-width: 760px; margin: 0 auto; }
+    .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+    .page-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 2rem; }
+    .section-title {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+    .game-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+      cursor: pointer;
+      transition: border-color 0.12s, background 0.12s;
+    }
+    .game-card:hover { border-color: var(--border2); background: var(--bg3); }
+    .game-card.live { border-color: var(--red); }
+    .game-info { flex: 1; }
+    .game-opponent { font-weight: 700; font-size: 1rem; }
+    .game-meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
+    .game-score {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 800;
+      font-size: 1.6rem;
+      text-align: right;
+    }
+    .game-score.win  { color: var(--green); }
+    .game-score.loss { color: var(--red); }
+    .empty-state { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a class="navbar-logo" href="team.html">Court<span>IQ</span></a>
+    <div class="navbar-actions">
+      <a class="btn btn-ghost btn-sm" href="team.html">Meu Time</a>
+      <button class="btn btn-ghost btn-sm" id="btn-logout">Sair</button>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="page-header">
+      <div class="page-title">Jogos</div>
+      <a class="btn btn-primary btn-sm" href="game-new.html">+ Novo jogo</a>
+    </div>
+
+    <!-- Ao vivo -->
+    <div id="live-section" class="hidden mb-3">
+      <div class="section-title">Ao vivo</div>
+      <div id="live-list"></div>
+    </div>
+
+    <!-- Agendados -->
+    <div class="mb-3">
+      <div class="section-title">Agendados</div>
+      <div id="scheduled-list"><div class="empty-state">Nenhum jogo agendado.</div></div>
+    </div>
+
+    <!-- Histórico -->
+    <div>
+      <div class="section-title">Histórico</div>
+      <div id="history-list"><div class="empty-state">Nenhum jogo encerrado.</div></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth, signOut } from '../js/auth.js';
+    import { getMyTeam } from '../js/team.js';
+    import { getGames } from '../js/games.js';
+    import { formatDate, formatTime } from '../js/utils.js';
+
+    document.getElementById('btn-logout').addEventListener('click', signOut);
+
+    async function init() {
+      const session = await requireAuth();
+      if (!session) return;
+
+      const team = await getMyTeam(session.user.id);
+      if (!team) { window.location.href = '../choose.html'; return; }
+      localStorage.setItem('currentTeamId', team.id);
+
+      const games = await getGames(team.id);
+      const live      = games.filter(g => g.status === 'live');
+      const scheduled = games.filter(g => g.status === 'scheduled');
+      const finished  = games.filter(g => g.status === 'finished');
+
+      // Ao vivo
+      if (live.length > 0) {
+        document.getElementById('live-section').classList.remove('hidden');
+        document.getElementById('live-list').innerHTML = live.map(g => gameCard(g, 'live')).join('');
+      }
+
+      // Agendados
+      document.getElementById('scheduled-list').innerHTML = scheduled.length > 0
+        ? scheduled.map(g => gameCard(g, 'scheduled')).join('')
+        : '<div class="empty-state">Nenhum jogo agendado.</div>';
+
+      // Histórico
+      document.getElementById('history-list').innerHTML = finished.length > 0
+        ? finished.map(g => gameCard(g, 'finished')).join('')
+        : '<div class="empty-state">Nenhum jogo encerrado ainda.</div>';
+    }
+
+    function gameCard(game, status) {
+      const date = `${formatDate(game.date)} às ${formatTime(game.date)}`;
+      const location = game.location ? ` · ${game.location}` : '';
+      const tournament = game.tournament ? ` <span class="badge">${game.tournament}</span>` : '';
+      const mando = game.is_home ? '🏠 Casa' : '✈️ Fora';
+
+      let scoreHtml = '';
+      let cardClass = 'game-card';
+      let onclick = '';
+
+      if (status === 'live') {
+        cardClass += ' live';
+        scoreHtml = '<span class="badge badge-red" style="font-size:0.75rem">AO VIVO</span>';
+        onclick = `onclick="goToInput('${game.id}')"`;
+      } else if (status === 'scheduled') {
+        scoreHtml = '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();goToInput(\'' + game.id + '\')">Iniciar</button>';
+        onclick = `onclick="goToInput('${game.id}')"`;
+      } else {
+        const score = game.our_score ?? '—';
+        const win = game.our_score != null && game.our_score > (game.opp_score || 0);
+        scoreHtml = `<div class="game-score ${win ? 'win' : 'loss'}">${score}</div>`;
+        onclick = `onclick="goToSummary('${game.id}')"`;
+      }
+
+      return `
+        <div class="${cardClass}" ${onclick}>
+          <div class="game-info">
+            <div class="game-opponent">vs ${game.opponent} ${mando}</div>
+            <div class="game-meta">${date}${location} ${tournament}</div>
+          </div>
+          ${scoreHtml}
+        </div>
+      `;
+    }
+
+    window.goToInput = function(id) {
+      localStorage.setItem('currentGameId', id);
+      window.location.href = `game-input.html?gameId=${id}`;
+    };
+
+    window.goToSummary = function(id) {
+      localStorage.setItem('currentGameId', id);
+      window.location.href = `game-summary.html?gameId=${id}`;
+    };
+
+    init();
+  </script>
+</body>
+</html>

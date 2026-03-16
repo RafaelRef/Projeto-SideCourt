@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 300">
+  <defs>
+    <pattern id="parquet" width="20" height="20" patternUnits="userSpaceOnUse">
+      <rect width="20" height="20" fill="#7c5c2e"/>
+      <rect width="10" height="10" fill="#8b6834"/>
+      <rect x="10" y="10" width="10" height="10" fill="#8b6834"/>
+    </pattern>
+  </defs>
+
+  <!-- Quadra -->
+  <rect width="560" height="300" fill="url(#parquet)"/>
+  <rect x="2" y="2" width="556" height="296" fill="none" stroke="#fff" stroke-width="2"/>
+
+  <!-- Linha do meio -->
+  <line x1="280" y1="2" x2="280" y2="298" stroke="#fff" stroke-width="1.5"/>
+
+  <!-- Círculo central -->
+  <circle cx="280" cy="150" r="36" fill="none" stroke="#fff" stroke-width="1.5"/>
+  <circle cx="280" cy="150" r="3" fill="#fff"/>
+
+  <!-- ===== LADO ESQUERDO ===== -->
+  <!-- Garrafão -->
+  <rect x="2" y="87" width="142" height="126" fill="none" stroke="#fff" stroke-width="1.5"/>
+  <!-- Semicírculo de lance livre -->
+  <path d="M 144 87 A 63 63 0 0 1 144 213" fill="none" stroke="#fff" stroke-width="1.5"/>
+  <!-- Linha restrita (arco) -->
+  <path d="M 2 138 A 40 40 0 0 1 2 162" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="4 3"/>
+  <!-- Arco de 3 pontos -->
+  <path d="M 2 52 L 60 52 A 195 195 0 0 1 60 248 L 2 248" fill="none" stroke="#fff" stroke-width="1.5"/>
+  <!-- Tabela -->
+  <rect x="2" y="133" width="8" height="34" fill="none" stroke="#fff" stroke-width="1.5"/>
+  <!-- Aro -->
+  <circle cx="36" cy="150" r="9" fill="none" stroke="#ff6b35" stroke-width="2"/>
+  <line x1="10" y1="150" x2="27" y2="150" stroke="#ff6b35" stroke-width="1.5"/>
+
+  <!-- ===== LADO DIREITO ===== -->
+  <!-- Garrafão -->
+  <rect x="416" y="87" width="142" height="126" fill="none" stroke="#fff" stroke-width="1.5"/>
+  <!-- Semicírculo de lance livre -->
+  <path d="M 416 87 A 63 63 0 0 0 416 213" fill="none" stroke="#fff" stroke-width="1.5"/>
+  <!-- Linha restrita -->
+  <path d="M 558 138 A 40 40 0 0 0 558 162" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="4 3"/>
+  <!-- Arco de 3 pontos -->
+  <path d="M 558 52 L 500 52 A 195 195 0 0 0 500 248 L 558 248" fill="none" stroke="#fff" stroke-width="1.5"/>
+  <!-- Tabela -->
+  <rect x="550" y="133" width="8" height="34" fill="none" stroke="#fff" stroke-width="1.5"/>
+  <!-- Aro -->
+  <circle cx="524" cy="150" r="9" fill="none" stroke="#ff6b35" stroke-width="2"/>
+  <line x1="550" y1="150" x2="533" y2="150" stroke="#ff6b35" stroke-width="1.5"/>
+</svg>

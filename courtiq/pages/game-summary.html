@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CourtIQ — Resumo do Jogo</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .main { padding: 1.5rem 1.25rem; max-width: 960px; margin: 0 auto; }
+    .game-result-header {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .result-opponent { color: var(--muted); font-size: 0.88rem; }
+    .result-score {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 800;
+      font-size: 3.5rem;
+      line-height: 1;
+    }
+    .result-score.win  { color: var(--green); }
+    .result-score.loss { color: var(--red); }
+    .result-label { font-size: 0.85rem; font-weight: 700; }
+
+    /* Box score table tweaks */
+    td.num { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 1rem; }
+    .player-cell { display: flex; align-items: center; gap: 0.5rem; }
+    .mini-avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--accent-dim);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 0.7rem;
+      color: var(--accent2); flex-shrink: 0;
+    }
+
+    /* Gráfico de quartos */
+    .quarter-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
+    .quarter-card { background: var(--bg3); border-radius: 10px; padding: 0.75rem; text-align: center; }
+    .quarter-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+    .quarter-score { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.8rem; }
+
+    /* Distribuição de pontos */
+    .dist-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.4rem; }
+    .dist-label { font-size: 0.8rem; color: var(--muted); width: 80px; }
+    .dist-bar-wrap { flex: 1; height: 12px; background: var(--bg3); border-radius: 6px; overflow: hidden; }
+    .dist-bar { height: 100%; border-radius: 6px; }
+    .dist-val { font-size: 0.82rem; font-weight: 600; width: 32px; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a class="navbar-logo" href="games.html">Court<span>IQ</span></a>
+    <div class="navbar-actions">
+      <a class="btn btn-ghost btn-sm" href="games.html">← Jogos</a>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="game-result-header">
+      <div class="result-opponent" id="result-meta">Carregando...</div>
+      <div class="result-score" id="result-score">—</div>
+      <div class="result-label" id="result-label"></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="setTab('boxscore')">Box Score</button>
+      <button class="tab-btn" onclick="setTab('team')">Time</button>
+    </div>
+
+    <!-- Box Score -->
+    <div class="tab-panel active" id="tab-boxscore">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Atleta</th>
+              <th>PTS</th><th>REB</th><th>AST</th><th>ROB</th><th>TOC</th><th>ERR</th><th>FAL</th><th>FG%</th><th>3P%</th><th>LL%</th>
+            </tr>
+          </thead>
+          <tbody id="boxscore-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Time -->
+    <div class="tab-panel" id="tab-team">
+      <h3 class="mb-2" style="font-size:1rem;font-weight:700;color:var(--muted)">Pontos por quarto</h3>
+      <div class="quarter-grid mb-3" id="quarter-grid"></div>
+
+      <h3 class="mb-2" style="font-size:1rem;font-weight:700;color:var(--muted)">Distribuição de pontos</h3>
+      <div id="dist-chart"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth } from '../js/auth.js';
+    import { getGame, getGamePlayers } from '../js/games.js';
+    import { getGameEvents } from '../js/events.js';
+    import { calcBoxScore, calcTeamScore, calcScoreByQuarter, calcPlayerStats } from '../js/stats.js';
+    import { getInitials, getQueryParam, pct, formatDate } from '../js/utils.js';
+
+    const gameId = getQueryParam('gameId') || localStorage.getItem('currentGameId');
+
+    window.setTab = function(name) {
+      document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', ['boxscore','team'][i] === name));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+    };
+
+    async function init() {
+      const session = await requireAuth();
+      if (!session) return;
+      if (!gameId) { window.location.href = 'games.html'; return; }
+
+      const [game, gamePlayers, events] = await Promise.all([
+        getGame(gameId),
+        getGamePlayers(gameId),
+        getGameEvents(gameId),
+      ]);
+
+      if (!game) { window.location.href = 'games.html'; return; }
+
+      const ourScore = calcTeamScore(events);
+      const meta = `${formatDate(game.date)} · ${game.opponent}${game.tournament ? ' · ' + game.tournament : ''}`;
+      document.getElementById('result-meta').textContent = meta;
+      document.getElementById('result-score').textContent = `${ourScore}`;
+      document.title = `CourtIQ — vs ${game.opponent}`;
+
+      // Box score
+      const boxRows = calcBoxScore(events, gamePlayers);
+      const totals = calcPlayerStats(events);
+      const tbody = document.getElementById('boxscore-body');
+      tbody.innerHTML = boxRows.map(row => `
+        <tr>
+          <td>
+            <div class="player-cell">
+              <div class="mini-avatar">${getInitials(row.player.name)}</div>
+              <div>
+                <div style="font-weight:600;font-size:0.88rem">${row.player.name}</div>
+                <div style="font-size:0.72rem;color:var(--muted)">#${row.player.jersey_number ?? '—'}</div>
+              </div>
+            </div>
+          </td>
+          <td class="num">${row.pts}</td>
+          <td>${row.reb}</td>
+          <td>${row.ast}</td>
+          <td>${row.stl}</td>
+          <td>${row.blk}</td>
+          <td>${row.to}</td>
+          <td>${row.foul}</td>
+          <td>${pct(row.fgMade, row.fgAtt)}</td>
+          <td>${pct(row.threeMade, row.threeAtt)}</td>
+          <td>${pct(row.ftMade, row.ftAtt)}</td>
+        </tr>
+      `).join('') + `
+        <tr class="totals">
+          <td><strong>TOTAIS</strong></td>
+          <td class="num">${totals.pts}</td>
+          <td>${totals.reb}</td>
+          <td>${totals.ast}</td>
+          <td>${totals.stl}</td>
+          <td>${totals.blk}</td>
+          <td>${totals.to}</td>
+          <td>${totals.foul}</td>
+          <td>${pct(totals.fgMade, totals.fgAtt)}</td>
+          <td>${pct(totals.threeMade, totals.threeAtt)}</td>
+          <td>${pct(totals.ftMade, totals.ftAtt)}</td>
+        </tr>
+      `;
+
+      // Por quarto
+      const byQ = calcScoreByQuarter(events);
+      document.getElementById('quarter-grid').innerHTML = [1,2,3,4].map(q => `
+        <div class="quarter-card">
+          <div class="quarter-label">${q}Q</div>
+          <div class="quarter-score">${byQ[q]}</div>
+        </div>
+      `).join('');
+
+      // Distribuição de pontos
+      const pts2  = events.filter(e => e.type === '2pt_made').length * 2;
+      const pts3  = events.filter(e => e.type === '3pt_made').length * 3;
+      const ptsLL = events.filter(e => e.type === 'ft_made').length;
+      const distMax = Math.max(pts2, pts3, ptsLL, 1);
+      document.getElementById('dist-chart').innerHTML = [
+        ['2 Pontos', pts2, '#3b82f6'],
+        ['3 Pontos', pts3, '#22c55e'],
+        ['Lances livres', ptsLL, '#f59e0b'],
+      ].map(([label, val, color]) => `
+        <div class="dist-row">
+          <div class="dist-label">${label}</div>
+          <div class="dist-bar-wrap"><div class="dist-bar" style="width:${Math.round(val/distMax*100)}%;background:${color}"></div></div>
+          <div class="dist-val">${val}</div>
+        </div>
+      `).join('');
+    }
+
+    init();
+  </script>
+</body>
+</html>
