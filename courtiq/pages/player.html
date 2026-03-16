@@ -322,16 +322,29 @@
       const btn = document.getElementById('btn-save-manual');
       errEl.textContent = '';
 
-      const get = id => parseInt(document.getElementById(id).value) || 0;
+      const get = id => Math.max(0, parseInt(document.getElementById(id).value) || 0);
       const events = [];
-      const push = (type, count) => { for (let i=0;i<count;i++) events.push(type); };
+      const push = (type, count) => { for (let i = 0; i < count; i++) events.push(type); };
+
+      // Validar: acertos não podem superar tentativas
+      const pairs = [
+        ['2PT', get('m-2pt-made'), get('m-2pt-att')],
+        ['3PT', get('m-3pt-made'), get('m-3pt-att')],
+        ['Lances livres', get('m-ft-made'), get('m-ft-att')],
+      ];
+      for (const [label, made, att] of pairs) {
+        if (made > att) {
+          errEl.textContent = `${label}: acertos (${made}) não podem superar tentativas (${att}).`;
+          return;
+        }
+      }
 
       push('2pt_made', get('m-2pt-made'));
       push('2pt_miss', get('m-2pt-att') - get('m-2pt-made'));
       push('3pt_made', get('m-3pt-made'));
       push('3pt_miss', get('m-3pt-att') - get('m-3pt-made'));
       push('ft_made',  get('m-ft-made'));
-      push('ft_miss',  get('m-ft-att')  - get('m-ft-made'));
+      push('ft_miss',  get('m-ft-att') - get('m-ft-made'));
       push('reb_def',  get('m-reb-def'));
       push('reb_off',  get('m-reb-off'));
       push('ast',  get('m-ast'));
@@ -339,9 +352,6 @@
       push('blk',  get('m-blk'));
       push('to',   get('m-to'));
       push('foul', get('m-foul'));
-
-      const invalid = events.filter(t => t.endsWith('miss') && t.includes('-1'));
-      if (events.some(t => false)) { errEl.textContent = 'Valores inválidos.'; return; }
 
       setLoading(btn, true);
       try {

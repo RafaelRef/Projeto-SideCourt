@@ -91,6 +91,15 @@
 
     <!-- Time -->
     <div class="tab-panel" id="tab-team">
+      <!-- Placar final resumido -->
+      <div id="team-result-row" class="mb-3" style="display:flex;align-items:center;gap:1rem;padding:0.75rem 1rem;background:var(--bg2);border:1px solid var(--border);border-radius:10px;">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:2rem;" id="team-score-display">—</div>
+        <div>
+          <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)" id="team-result-label"></div>
+          <div style="font-size:0.8rem;color:var(--muted)" id="team-opp-name"></div>
+        </div>
+      </div>
+
       <h3 class="mb-2" style="font-size:1rem;font-weight:700;color:var(--muted)">Pontos por quarto</h3>
       <div class="quarter-grid mb-3" id="quarter-grid"></div>
 
@@ -181,6 +190,16 @@
           <td>${pct(totals.ftMade, totals.ftAtt)}</td>
         </tr>
       `;
+
+      // Placar resumido na aba Time
+      const scoreDisplay = oppScore != null ? `${ourScore} — ${oppScore}` : `${ourScore}`;
+      const scoreEl2 = document.getElementById('team-score-display');
+      scoreEl2.textContent = scoreDisplay;
+      if (win === true)  scoreEl2.style.color = 'var(--green)';
+      if (win === false) scoreEl2.style.color = 'var(--red)';
+      document.getElementById('team-result-label').textContent =
+        win === true ? 'VITÓRIA' : win === false ? 'DERROTA' : 'RESULTADO';
+      document.getElementById('team-opp-name').textContent = `vs ${game.opponent}`;
 
       // Por quarto
       const byQ = calcScoreByQuarter(events);

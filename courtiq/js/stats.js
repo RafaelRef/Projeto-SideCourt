@@ -55,7 +55,9 @@ export function calcBoxScore(events, players) {
     const evs = events.filter(e => e.player_id === p.id);
     const st = calcPlayerStats(evs);
     return { player: p, ...st };
-  }).sort((a, b) => b.pts - a.pts);
+  })
+  .filter(row => row.pts > 0 || row.reb > 0 || row.ast > 0 || row.stl > 0 || row.blk > 0 || row.foul > 0)
+  .sort((a, b) => b.pts - a.pts);
 }
 
 export function calcTeamScore(events) {

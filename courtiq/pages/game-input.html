@@ -138,15 +138,12 @@
     /* Responsividade mobile */
     @media (max-width: 480px) {
       .game-body { grid-template-columns: 1fr; grid-template-rows: auto; height: auto; }
-      .player-sidebar { border-right: none; border-bottom: 1px solid var(--border); max-height: 80px; overflow: hidden; }
-      .player-sidebar.expanded { max-height: none; }
-      .sidebar-toggle { display: block !important; }
+      .player-sidebar { display: none !important; }
+      #mobile-player-bar { display: block !important; }
       .stat-buttons { grid-template-columns: 1fr 1fr; }
       .shotchart-panel { border-left: none; border-top: 1px solid var(--border); }
       .game-header { top: 56px; }
     }
-
-    .sidebar-toggle { display: none; width: 100%; margin-bottom: 0.4rem; }
   </style>
 </head>
 <body>
@@ -185,12 +182,18 @@
     <button style="margin-left:auto;font-size:0.8rem;color:var(--muted);background:none;border:none;cursor:pointer" onclick="cancelShot()">Cancelar</button>
   </div>
 
+  <!-- Select mobile de atleta (só visível em ≤480px) -->
+  <div id="mobile-player-bar" style="display:none;padding:0.5rem 0.75rem;background:var(--bg2);border-bottom:1px solid var(--border);">
+    <select id="mobile-player-select" class="select" onchange="selectPlayer(this.value)" style="font-weight:600;">
+      <option value="">Selecione a atleta...</option>
+    </select>
+  </div>
+
   <!-- Layout 3 colunas -->
   <div class="game-body">
 
     <!-- Coluna 1: Atletas -->
     <div class="player-sidebar" id="player-sidebar">
-      <button class="sidebar-toggle btn btn-ghost btn-sm" id="sidebar-toggle-btn" onclick="toggleSidebar()">Atletas ▾</button>
       <div class="sidebar-title">Selecione a atleta</div>
       <div id="sidebar-players"></div>
     </div>
@@ -267,6 +270,7 @@
     let gameEvents = [];
     let scFilter = 'all';
     let oppScore = 0;
+    let oppScoreSaveTimer = null;
     const svgEl = document.getElementById('sc-svg');
 
     window.setQuarter = function(q) {
@@ -277,6 +281,11 @@
     window.changeOppScore = function(delta) {
       oppScore = Math.max(0, oppScore + delta);
       document.getElementById('score-opp').textContent = oppScore;
+      // Auto-salvar com debounce de 1s para não gerar chamadas excessivas
+      clearTimeout(oppScoreSaveTimer);
+      oppScoreSaveTimer = setTimeout(() => {
+        updateGame(gameId, { opp_score: oppScore }).catch(() => {});
+      }, 1000);
     };
 
     window.toggleSidebar = function() {
@@ -288,6 +297,8 @@
     function selectPlayer(id) {
       selectedPlayerId = id;
       document.querySelectorAll('.sidebar-player').forEach(el => el.classList.toggle('selected', el.dataset.id === id));
+      const mobileSelect = document.getElementById('mobile-player-select');
+      if (mobileSelect.value !== id) mobileSelect.value = id;
       const p = gamePlayers.find(p => p.id === id);
       if (p) {
         document.getElementById('selected-label').className = 'selected-player-label';
@@ -386,6 +397,11 @@
           <div class="sidebar-mini-stats" id="mini-${p.id}">0pts 0reb 0ast</div>
         </div>
       `).join('');
+
+      // Popular select mobile
+      const mobileSelect = document.getElementById('mobile-player-select');
+      mobileSelect.innerHTML = '<option value="">Selecione a atleta...</option>' +
+        gamePlayers.map(p => `<option value="${p.id}">#${p.jersey_number ?? '—'} ${p.name}</option>`).join('');
     }
 
     document.getElementById('btn-end-game').addEventListener('click', async () => {
