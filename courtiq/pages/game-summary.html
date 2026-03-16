@@ -127,10 +127,17 @@
 
       if (!game) { window.location.href = 'games.html'; return; }
 
-      const ourScore = calcTeamScore(events);
+      const ourScore = game.our_score ?? calcTeamScore(events);
+      const oppScore = game.opp_score ?? null;
+      const scoreText = oppScore != null ? `${ourScore} — ${oppScore}` : `${ourScore}`;
+      const win = oppScore != null ? ourScore > oppScore : null;
       const meta = `${formatDate(game.date)} · ${game.opponent}${game.tournament ? ' · ' + game.tournament : ''}`;
       document.getElementById('result-meta').textContent = meta;
-      document.getElementById('result-score').textContent = `${ourScore}`;
+      const scoreEl = document.getElementById('result-score');
+      scoreEl.textContent = scoreText;
+      if (win === true)  scoreEl.classList.add('win');
+      if (win === false) scoreEl.classList.add('loss');
+      document.getElementById('result-label').textContent = win === true ? 'VITÓRIA' : win === false ? 'DERROTA' : '';
       document.title = `CourtIQ — vs ${game.opponent}`;
 
       // Box score

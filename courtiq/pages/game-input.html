@@ -27,6 +27,10 @@
     .game-score { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.6rem; }
     .game-vs { color: var(--muted); font-size: 0.8rem; }
     .game-header-right { display: flex; align-items: center; gap: 0.5rem; }
+    .opp-score-ctrl { display: flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; color: var(--muted); }
+    .opp-score-ctrl button { width: 22px; height: 22px; border-radius: 4px; background: var(--bg3); border: 1px solid var(--border2); color: var(--text); font-size: 0.85rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .opp-score-ctrl button:hover { background: var(--border2); }
+    .opp-score-val { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 1rem; min-width: 20px; text-align: center; }
 
     /* Layout 3 colunas */
     .game-body {
@@ -156,7 +160,12 @@
       <span class="live-badge">● AO VIVO</span>
       <div>
         <div class="game-vs" id="game-vs">vs —</div>
-        <div class="game-score" id="game-score">0 — 0</div>
+        <div class="game-score"><span id="score-our">0</span> — <span id="score-opp">0</span></div>
+      </div>
+      <div class="opp-score-ctrl" title="Placar adversário">
+        <button onclick="changeOppScore(-1)">−</button>
+        <span class="opp-score-val" id="opp-label">Adv</span>
+        <button onclick="changeOppScore(1)">+</button>
       </div>
     </div>
     <div class="game-header-right">
@@ -245,7 +254,7 @@
     import { requireAuth } from '../js/auth.js';
     import { getGame, getGamePlayers, updateGameStatus, updateGame } from '../js/games.js';
     import { createEvent, getGameEvents, deleteEvent } from '../js/events.js';
-    import { calcPlayerStats } from '../js/stats.js';
+    import { calcPlayerStats, calcTeamScore } from '../js/stats.js';
     import { initShotChart, activateShotMode, deactivateShotMode, addShot, renderShots, getShotStats } from '../js/shotchart.js';
     import { getQueryParam, getInitials, showToast } from '../js/utils.js';
 
@@ -257,11 +266,17 @@
     let pendingEventType = null;
     let gameEvents = [];
     let scFilter = 'all';
+    let oppScore = 0;
     const svgEl = document.getElementById('sc-svg');
 
     window.setQuarter = function(q) {
       currentQuarter = q;
       document.querySelectorAll('.quarter-btn').forEach((b, i) => b.classList.toggle('active', i+1 === q));
+    };
+
+    window.changeOppScore = function(delta) {
+      oppScore = Math.max(0, oppScore + delta);
+      document.getElementById('score-opp').textContent = oppScore;
     };
 
     window.toggleSidebar = function() {
@@ -337,8 +352,8 @@
     };
 
     function updateScoreboard() {
-      const pts = calcPlayerStats(gameEvents).pts;
-      document.getElementById('game-score').textContent = `${pts} — ?`;
+      const pts = calcTeamScore(gameEvents);
+      document.getElementById('score-our').textContent = pts;
     }
 
     function updateSidebarStats() {
@@ -376,7 +391,8 @@
     document.getElementById('btn-end-game').addEventListener('click', async () => {
       if (!confirm('Encerrar o jogo?')) return;
       try {
-        await updateGameStatus(gameId, 'finished');
+        const ourScore = calcTeamScore(gameEvents);
+        await updateGame(gameId, { status: 'finished', our_score: ourScore, opp_score: oppScore });
         window.location.href = `game-summary.html?gameId=${gameId}`;
       } catch (err) {
         showToast('Erro ao encerrar jogo.', 'error');
@@ -401,6 +417,7 @@
       }
 
       document.getElementById('game-vs').textContent = `vs ${game.opponent}`;
+      document.getElementById('opp-label').textContent = game.opponent.split(' ')[0];
       document.title = `CourtIQ — vs ${game.opponent}`;
 
       gamePlayers = await getGamePlayers(gameId);

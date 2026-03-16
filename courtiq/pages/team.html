@@ -174,7 +174,7 @@
     import { getMyTeam, getPlayers, createPlayer, updatePlayer, deactivatePlayer } from '../js/team.js';
     import { getGames } from '../js/games.js';
     import { getGameEvents } from '../js/events.js';
-    import { calcPlayerStats } from '../js/stats.js';
+    import { calcPlayerStats, calcTeamScore } from '../js/stats.js';
     import { getInitials, showToast, setLoading } from '../js/utils.js';
     import { drawCourt } from '../js/shotchart.js';
 
@@ -366,15 +366,20 @@
       chartPts.innerHTML = '';
       chartFg.innerHTML = '';
 
+      const gameDataList = [];
       for (const g of finished) {
         const events = await getGameEvents(g.id);
-        const st = calcPlayerStats(events);
-        totPts += st.pts; totReb += st.reb; totAst += st.ast; totStl += st.stl;
-        allStats.push(st);
+        const pts = calcTeamScore(events);
+        const st = calcPlayerStats(events); // para reb, ast, stl, fgPct do time
+        gameDataList.push({ g, pts, st });
+        totPts += pts; totReb += st.reb; totAst += st.ast; totStl += st.stl;
+      }
 
+      const maxPts = Math.max(...gameDataList.map(d => d.pts), 1);
+      for (const { g, pts, st } of gameDataList) {
         const label = new Date(g.date).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
-        chartPts.innerHTML += barRow(label, st.pts, Math.max(...allStats.map(s=>s.pts), 1), 'var(--accent)');
-        chartFg.innerHTML += barRow(label, st.fgPct, 100, 'var(--green)') ;
+        chartPts.innerHTML += barRow(label, pts, maxPts, 'var(--accent)');
+        chartFg.innerHTML += barRow(label, st.fgPct, 100, 'var(--green)');
       }
 
       const n = finished.length;

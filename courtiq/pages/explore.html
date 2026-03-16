@@ -65,10 +65,11 @@
     let allGames = [];
     let currentFilter = '';
 
+    const FILTERS = ['', 'NDU 17', 'JUBS 2026'];
     window.setFilter = function(f) {
       currentFilter = f;
       document.querySelectorAll('.filter-pill').forEach((b, i) => {
-        b.classList.toggle('active', ['',' NDU 17','JUBS 2026'][i] === f || b.textContent.trim() === (f || 'Todos'));
+        b.classList.toggle('active', FILTERS[i] === f);
       });
       renderTable();
     };
@@ -87,7 +88,7 @@
       // Agregar por time
       const teamStats = allTeams.map(team => {
         const teamGames = games.filter(g => g.team_id === team.id);
-        const wins = teamGames.filter(g => (g.our_score || 0) > 0).length; // simplificado: conta jogos finalizados
+        const wins = teamGames.filter(g => (g.our_score || 0) > (g.opp_score || 0)).length;
         const losses = teamGames.length - wins;
         const avgPts = teamGames.length > 0
           ? Math.round(teamGames.reduce((a, g) => a + (g.our_score || 0), 0) / teamGames.length)
