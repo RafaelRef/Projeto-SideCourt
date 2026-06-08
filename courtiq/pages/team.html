@@ -15,33 +15,70 @@
     .squad-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
     .jersey { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.1rem; color: var(--accent); min-width: 28px; }
 
-    /* Formação */
-    .formation-controls { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
-    .formation-court-wrap { position: relative; display: inline-block; width: 100%; max-width: 560px; }
-    .formation-court { width: 100%; display: block; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+    /* Barra de controles (formação / jogadas) */
+    .control-bar { display: flex; gap: 0.6rem; margin-bottom: 0.9rem; flex-wrap: wrap; align-items: flex-end; }
+    .control-bar .form-group { margin: 0; }
+    .control-bar .input, .control-bar .select { min-width: 130px; }
+
+    /* Banco de atletas */
+    .bench { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-bottom: 0.75rem; min-height: 36px; }
+    .bench-chip {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.32rem 0.6rem; border-radius: 999px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      color: var(--text); cursor: pointer; font-size: 0.8rem;
+    }
+    .bench-chip:hover { border-color: var(--accent); }
+    .bench-chip-num { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; color: var(--accent); }
+
+    /* Quadra */
+    .court-wrap { position: relative; display: block; width: 100%; max-width: 600px; touch-action: none; }
+    .court-svg { width: 100%; display: block; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
     #formation-dots { position: absolute; inset: 0; pointer-events: none; }
     #formation-dots .player-dot { pointer-events: all; }
+
     .player-dot {
       position: absolute;
-      width: 34px; height: 34px;
+      width: 46px; height: 46px;
       border-radius: 50%;
       background: var(--accent-dim);
       border: 2px solid var(--accent);
-      display: flex; align-items: center; justify-content: center;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
       font-family: 'Barlow Condensed', sans-serif;
-      font-weight: 800; font-size: 0.75rem;
       color: var(--accent2);
-      cursor: pointer;
       transform: translate(-50%, -50%);
-      transition: background 0.15s;
+      transition: box-shadow 0.15s;
+      user-select: none;
     }
-    .player-dot:hover { background: var(--accent); color: #fff; }
+    .player-dot.draggable { cursor: grab; }
+    .player-dot.dragging { cursor: grabbing; box-shadow: 0 0 0 4px var(--accent-dim); z-index: 5; }
+    .player-dot .dot-num { font-weight: 800; font-size: 0.82rem; line-height: 1; }
+    .player-dot .dot-name { font-weight: 600; font-size: 0.52rem; line-height: 1; margin-top: 1px; max-width: 42px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+    .player-dot .dot-remove {
+      position: absolute; top: -6px; right: -6px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--red); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem; font-weight: 800; line-height: 1; cursor: pointer;
+    }
+
+    /* Playbook toolbar */
+    .toolbar { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem; }
+    .tool-btn {
+      padding: 0.35rem 0.6rem; border-radius: 7px; font-size: 0.78rem; font-weight: 600;
+      background: var(--bg3); border: 1px solid var(--border2); color: var(--muted); cursor: pointer;
+    }
+    .tool-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent2); }
+    .step-bar { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    .step-indicator { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.05rem; min-width: 92px; text-align: center; }
+    .play-legend { display: flex; flex-wrap: wrap; gap: 0.9rem; margin-top: 0.6rem; font-size: 0.72rem; color: var(--muted); }
+    .play-legend span { display: inline-flex; align-items: center; gap: 0.3rem; }
+    .leg-line { width: 22px; height: 0; border-top: 2.5px solid; }
 
     /* Evolução */
     .evolution-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     .chart-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; }
     .chart-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.75rem; }
-    .record-badge { display: flex; gap: 0.5rem; }
 
     @media (max-width: 600px) {
       .evolution-grid { grid-template-columns: 1fr; }
@@ -68,6 +105,7 @@
     <div class="tabs">
       <button class="tab-btn active" onclick="setTab('squad')">Elenco</button>
       <button class="tab-btn" onclick="setTab('formation')">Formação</button>
+      <button class="tab-btn" onclick="setTab('plays')">Jogadas</button>
       <button class="tab-btn" onclick="setTab('evolution')">Evolução</button>
     </div>
 
@@ -84,29 +122,103 @@
 
     <!-- Aba Formação -->
     <div class="tab-panel" id="tab-formation">
-      <div class="formation-controls">
-        <div class="form-group" style="flex:1;min-width:160px">
-          <label class="form-label">Defesa</label>
-          <select class="select" id="defense-select" onchange="updateFormation()">
-            <option>2-3</option>
-            <option>Man-to-man</option>
-            <option>1-3-1</option>
-            <option>3-2</option>
-            <option>1-2-2</option>
+      <div class="control-bar">
+        <div class="form-group" style="flex:1;min-width:150px">
+          <label class="form-label">Formação salva</label>
+          <select class="select" id="lineup-select" onchange="loadSelectedLineup()">
+            <option value="">— Nova formação —</option>
           </select>
         </div>
-        <div class="form-group" style="flex:1;min-width:160px">
+        <div class="form-group" style="flex:1;min-width:150px">
+          <label class="form-label">Nome da formação</label>
+          <input class="input" type="text" id="lineup-name" placeholder="Ex: Titular pressão" maxlength="40" />
+        </div>
+      </div>
+      <div class="control-bar">
+        <div class="form-group">
+          <label class="form-label">Defesa</label>
+          <select class="select" id="defense-select">
+            <option>2-3</option><option>Man-to-man</option><option>1-3-1</option><option>3-2</option><option>1-2-2</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label class="form-label">Ataque</label>
-          <select class="select" id="offense-select" onchange="updateFormation()">
-            <option>Motion</option>
-            <option>Princeton</option>
-            <option>Pick &amp; Roll</option>
+          <select class="select" id="offense-select">
+            <option>Motion</option><option>Princeton</option><option>Pick &amp; Roll</option>
+          </select>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btn-auto-five">Titulares (auto)</button>
+        <button class="btn btn-ghost btn-sm" id="btn-clear-formation">Limpar</button>
+        <button class="btn btn-primary btn-sm" id="btn-save-lineup">Salvar</button>
+        <button class="btn btn-ghost btn-sm" id="btn-delete-lineup" style="color:var(--red)">Excluir</button>
+      </div>
+
+      <div class="text-muted text-sm mb-1">Toque numa atleta para escalá-la · arraste na quadra para posicionar · × para remover</div>
+      <div class="bench" id="formation-bench"></div>
+      <div class="court-wrap" id="formation-wrap">
+        <svg class="court-svg" viewBox="0 0 560 300" id="formation-svg"></svg>
+        <div id="formation-dots"></div>
+      </div>
+    </div>
+
+    <!-- Aba Jogadas -->
+    <div class="tab-panel" id="tab-plays">
+      <div class="control-bar">
+        <div class="form-group" style="flex:1;min-width:150px">
+          <label class="form-label">Jogada salva</label>
+          <select class="select" id="play-select" onchange="loadSelectedPlay()">
+            <option value="">— Nova jogada —</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1;min-width:150px">
+          <label class="form-label">Nome da jogada</label>
+          <input class="input" type="text" id="play-name" placeholder="Ex: Pick &amp; roll lateral" maxlength="40" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo</label>
+          <select class="select" id="play-category">
+            <option value="offense">Ataque</option>
+            <option value="defense">Defesa</option>
+            <option value="inbound">Reposição</option>
           </select>
         </div>
       </div>
-      <div class="formation-court-wrap" id="formation-wrap">
-        <svg class="formation-court" viewBox="0 0 560 300" id="formation-svg"></svg>
-        <div id="formation-dots"></div>
+      <div class="control-bar">
+        <button class="btn btn-ghost btn-sm" id="btn-play-animate">▶ Animar</button>
+        <button class="btn btn-primary btn-sm" id="btn-save-play">Salvar</button>
+        <button class="btn btn-ghost btn-sm" id="btn-delete-play" style="color:var(--red)">Excluir</button>
+      </div>
+
+      <div class="toolbar" id="play-toolbar">
+        <button class="tool-btn active" data-tool="select">✋ Mover</button>
+        <button class="tool-btn" data-tool="player">● Jogadora</button>
+        <button class="tool-btn" data-tool="ball">🏀 Bola</button>
+        <button class="tool-btn" data-tool="cone">▲ Defensor</button>
+        <button class="tool-btn" data-tool="move">→ Movimento</button>
+        <button class="tool-btn" data-tool="pass">⇢ Passe</button>
+        <button class="tool-btn" data-tool="screen">⊥ Bloqueio</button>
+        <button class="tool-btn" data-tool="dribble">∿ Drible</button>
+        <button class="tool-btn" data-tool="erase">⌫ Apagar</button>
+      </div>
+
+      <div class="court-wrap" id="play-wrap">
+        <svg class="court-svg" viewBox="0 0 560 300" id="play-svg"></svg>
+      </div>
+
+      <div class="step-bar">
+        <button class="btn btn-ghost btn-sm" id="btn-step-prev">‹</button>
+        <div class="step-indicator" id="step-indicator">Passo 1 / 1</div>
+        <button class="btn btn-ghost btn-sm" id="btn-step-next">›</button>
+        <button class="btn btn-ghost btn-sm" id="btn-step-add">+ Passo</button>
+        <button class="btn btn-ghost btn-sm" id="btn-step-del" style="color:var(--red)">Excluir passo</button>
+        <input class="input" id="step-note" placeholder="Anotação do passo" maxlength="80" style="flex:1;min-width:160px" />
+      </div>
+
+      <div class="play-legend">
+        <span><span class="leg-line" style="border-color:#e2e8f0"></span> Movimento</span>
+        <span><span class="leg-line" style="border-color:#22c55e;border-style:dashed"></span> Passe</span>
+        <span><span class="leg-line" style="border-color:#f59e0b"></span> Bloqueio</span>
+        <span><span class="leg-line" style="border-color:#e2e8f0;border-style:dotted"></span> Drible</span>
       </div>
     </div>
 
@@ -117,24 +229,16 @@
         <div class="stat-card"><div class="value" id="avg-reb">—</div><div class="label">REB/j</div></div>
         <div class="stat-card"><div class="value" id="avg-ast">—</div><div class="label">AST/j</div></div>
         <div class="stat-card"><div class="value" id="avg-stl">—</div><div class="label">ROB/j</div></div>
-        <div class="stat-card">
-          <div class="value" id="record-w" style="color:var(--green)">0</div>
-          <div class="label">Vitórias</div>
-        </div>
-        <div class="stat-card">
-          <div class="value" id="record-l" style="color:var(--red)">0</div>
-          <div class="label">Derrotas</div>
-        </div>
+        <div class="stat-card"><div class="value" id="record-w" style="color:var(--green)">0</div><div class="label">Vitórias</div></div>
+        <div class="stat-card"><div class="value" id="record-l" style="color:var(--red)">0</div><div class="label">Derrotas</div></div>
       </div>
       <div class="evolution-grid">
-        <div class="chart-card">
-          <div class="chart-title">Pontos por jogo</div>
-          <div class="bar-chart" id="chart-pts"></div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-title">FG% por jogo</div>
-          <div class="bar-chart" id="chart-fg"></div>
-        </div>
+        <div class="chart-card"><div class="chart-title">Pontos por jogo</div><div class="bar-chart" id="chart-pts"></div></div>
+        <div class="chart-card"><div class="chart-title">Aproveitamento (FG%)</div><div class="bar-chart" id="chart-fg"></div></div>
+        <div class="chart-card"><div class="chart-title">Rebotes por jogo</div><div class="bar-chart" id="chart-reb"></div></div>
+        <div class="chart-card"><div class="chart-title">Assistências por jogo</div><div class="bar-chart" id="chart-ast"></div></div>
+        <div class="chart-card"><div class="chart-title">Volume de jogo (arremessos)</div><div class="bar-chart" id="chart-vol"></div></div>
+        <div class="chart-card"><div class="chart-title">Saldo de pontos</div><div class="bar-chart" id="chart-diff"></div></div>
       </div>
     </div>
   </div>
@@ -157,10 +261,7 @@
             <label class="form-label">Posição</label>
             <select class="select" id="p-position">
               <option value="">Selecione</option>
-              <option>Armadora</option>
-              <option>Ala</option>
-              <option>Ala-Pivô</option>
-              <option>Pivô</option>
+              <option>Armadora</option><option>Ala</option><option>Ala-Pivô</option><option>Pivô</option>
             </select>
           </div>
         </div>
@@ -175,42 +276,44 @@
 
   <script type="module">
     import { requireAuth, signOut } from '../js/auth.js';
-    import { getMyTeam, getPlayers, createPlayer, updatePlayer, deactivatePlayer } from '../js/team.js';
+    import {
+      getMyTeam, getPlayers, createPlayer, updatePlayer, deactivatePlayer,
+      getLineups, saveLineup, deleteLineup,
+      getPlays, savePlay, deletePlay,
+    } from '../js/team.js';
     import { getGames } from '../js/games.js';
     import { getGameEvents } from '../js/events.js';
     import { calcPlayerStats, calcTeamScore } from '../js/stats.js';
     import { getInitials, showToast, setLoading } from '../js/utils.js';
-    import { drawCourt } from '../js/shotchart.js';
+    import { createFormationEditor } from '../js/formation.js';
+    import { createPlaybook } from '../js/playbook.js';
 
     let team = null;
     let players = [];
     let editingPlayerId = null;
+    let formation = null, lineups = [], currentLineupId = '';
+    let playbook = null, plays = [], currentPlayId = '';
 
     document.getElementById('btn-logout').addEventListener('click', signOut);
 
-    // Tabs
     window.setTab = function(name) {
-      document.querySelectorAll('.tab-btn').forEach((b, i) => {
-        const ids = ['squad','formation','evolution'];
-        b.classList.toggle('active', ids[i] === name);
-      });
+      const ids = ['squad','formation','plays','evolution'];
+      document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', ids[i] === name));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.getElementById('tab-' + name).classList.add('active');
-      if (name === 'formation') renderFormation();
+      if (name === 'formation') initFormationTab();
+      if (name === 'plays') initPlaysTab();
       if (name === 'evolution') loadEvolution();
     };
 
     async function init() {
       const session = await requireAuth();
       if (!session) return;
-
       team = await getMyTeam(session.user.id);
       if (!team) { window.location.href = '../choose.html'; return; }
       localStorage.setItem('currentTeamId', team.id);
-
       document.getElementById('team-title').textContent = team.name;
       document.getElementById('team-subtitle').textContent = 'Basquete universitário';
-
       await loadPlayers();
     }
 
@@ -286,7 +389,6 @@
       const btn = document.getElementById('btn-save-player');
       errEl.textContent = '';
       if (!name) { errEl.textContent = 'Informe o nome da atleta.'; return; }
-
       setLoading(btn, true);
       try {
         if (editingPlayerId) {
@@ -316,77 +418,255 @@
       }
     };
 
-    // Formação
+    // ============================================================
+    // FORMAÇÃO
+    // ============================================================
     const FORMATIONS = {
-      '2-3': [{x:0.5,y:0.15},{x:0.3,y:0.15},{x:0.7,y:0.15},{x:0.25,y:0.55},{x:0.75,y:0.55}],
-      'Man-to-man': [{x:0.5,y:0.12},{x:0.28,y:0.32},{x:0.72,y:0.32},{x:0.35,y:0.65},{x:0.65,y:0.65}],
-      '1-3-1': [{x:0.5,y:0.08},{x:0.28,y:0.35},{x:0.5,y:0.35},{x:0.72,y:0.35},{x:0.5,y:0.7}],
-      '3-2': [{x:0.3,y:0.12},{x:0.5,y:0.12},{x:0.7,y:0.12},{x:0.35,y:0.55},{x:0.65,y:0.55}],
-      '1-2-2': [{x:0.5,y:0.08},{x:0.3,y:0.35},{x:0.7,y:0.35},{x:0.25,y:0.65},{x:0.75,y:0.65}],
+      '2-3': [{x:0.5,y:0.18},{x:0.3,y:0.18},{x:0.7,y:0.18},{x:0.25,y:0.5},{x:0.75,y:0.5}],
+      'Man-to-man': [{x:0.5,y:0.15},{x:0.28,y:0.35},{x:0.72,y:0.35},{x:0.35,y:0.6},{x:0.65,y:0.6}],
+      '1-3-1': [{x:0.5,y:0.1},{x:0.28,y:0.38},{x:0.5,y:0.38},{x:0.72,y:0.38},{x:0.5,y:0.65}],
+      '3-2': [{x:0.3,y:0.15},{x:0.5,y:0.15},{x:0.7,y:0.15},{x:0.35,y:0.5},{x:0.65,y:0.5}],
+      '1-2-2': [{x:0.5,y:0.1},{x:0.3,y:0.38},{x:0.7,y:0.38},{x:0.25,y:0.6},{x:0.75,y:0.6}],
     };
+    let formationInited = false;
 
-    function renderFormation() {
-      const svg = document.getElementById('formation-svg');
-      drawCourt(svg);
-      const defense = document.getElementById('defense-select').value;
-      const positions = FORMATIONS[defense] || FORMATIONS['2-3'];
-      const dotsEl = document.getElementById('formation-dots');
-      dotsEl.innerHTML = '';
-
-      players.slice(0, 5).forEach((p, i) => {
-        const pos = positions[i] || { x: 0.5, y: 0.5 };
-        const dot = document.createElement('div');
-        dot.className = 'player-dot';
-        dot.title = p.name;
-        dot.textContent = `#${p.jersey_number ?? i+1}`;
-        dot.style.left = (pos.x * 100) + '%';
-        dot.style.top = (pos.y * 100) + '%';
-        dot.onclick = () => goToPlayer(p.id);
-        dotsEl.appendChild(dot);
-      });
+    async function initFormationTab() {
+      if (!formationInited) {
+        formation = createFormationEditor({
+          svg: document.getElementById('formation-svg'),
+          dotsLayer: document.getElementById('formation-dots'),
+          benchEl: document.getElementById('formation-bench'),
+        });
+        formationInited = true;
+      }
+      formation.setPlayers(players);
+      lineups = await getLineups(team.id);
+      renderLineupSelect();
     }
 
-    window.updateFormation = renderFormation;
+    function renderLineupSelect() {
+      const sel = document.getElementById('lineup-select');
+      sel.innerHTML = '<option value="">— Nova formação —</option>' +
+        lineups.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+      sel.value = currentLineupId;
+    }
 
-    // Evolução
+    window.loadSelectedLineup = function() {
+      const id = document.getElementById('lineup-select').value;
+      currentLineupId = id;
+      const l = lineups.find(x => x.id === id);
+      if (!l) {
+        document.getElementById('lineup-name').value = '';
+        formation.clear();
+        return;
+      }
+      document.getElementById('lineup-name').value = l.name;
+      if (l.defense) document.getElementById('defense-select').value = l.defense;
+      if (l.offense) document.getElementById('offense-select').value = l.offense;
+      formation.loadSpots(l.spots);
+    };
+
+    document.getElementById('btn-auto-five').addEventListener('click', () => {
+      const defense = document.getElementById('defense-select').value;
+      const preset = FORMATIONS[defense] || FORMATIONS['2-3'];
+      const spots = players.slice(0, 5).map((p, i) => ({ player_id: p.id, x: preset[i].x, y: preset[i].y }));
+      formation.loadSpots(spots);
+    });
+
+    document.getElementById('btn-clear-formation').addEventListener('click', () => formation.clear());
+
+    document.getElementById('btn-save-lineup').addEventListener('click', async () => {
+      const name = document.getElementById('lineup-name').value.trim();
+      const spots = formation.getSpots();
+      if (!name) { showToast('Dê um nome à formação.', 'error'); return; }
+      if (spots.length === 0) { showToast('Escale ao menos uma atleta.', 'error'); return; }
+      const btn = document.getElementById('btn-save-lineup');
+      setLoading(btn, true);
+      try {
+        const saved = await saveLineup(team.id, {
+          id: currentLineupId || null, name,
+          defense: document.getElementById('defense-select').value,
+          offense: document.getElementById('offense-select').value,
+          spots,
+        });
+        currentLineupId = saved.id;
+        lineups = await getLineups(team.id);
+        renderLineupSelect();
+        showToast('Formação salva!', 'success');
+      } catch (err) {
+        showToast(err.message || 'Erro ao salvar formação.', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+
+    document.getElementById('btn-delete-lineup').addEventListener('click', async () => {
+      if (!currentLineupId) { showToast('Nenhuma formação carregada.', ''); return; }
+      if (!confirm('Excluir esta formação?')) return;
+      try {
+        await deleteLineup(currentLineupId);
+        currentLineupId = '';
+        document.getElementById('lineup-name').value = '';
+        formation.clear();
+        lineups = await getLineups(team.id);
+        renderLineupSelect();
+        showToast('Formação excluída.', '');
+      } catch (err) {
+        showToast('Erro ao excluir.', 'error');
+      }
+    });
+
+    // ============================================================
+    // JOGADAS
+    // ============================================================
+    let playsInited = false;
+
+    async function initPlaysTab() {
+      if (!playsInited) {
+        playbook = createPlaybook({
+          svg: document.getElementById('play-svg'),
+          onChange: ({ index, total, note }) => {
+            document.getElementById('step-indicator').textContent = `Passo ${index + 1} / ${total}`;
+            document.getElementById('step-note').value = note || '';
+          },
+        });
+        wirePlaybookControls();
+        playsInited = true;
+      }
+      plays = await getPlays(team.id);
+      renderPlaySelect();
+    }
+
+    function wirePlaybookControls() {
+      document.querySelectorAll('#play-toolbar .tool-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#play-toolbar .tool-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          playbook.setTool(btn.dataset.tool);
+        });
+      });
+      document.getElementById('btn-step-prev').addEventListener('click', () => playbook.prev());
+      document.getElementById('btn-step-next').addEventListener('click', () => playbook.next());
+      document.getElementById('btn-step-add').addEventListener('click', () => playbook.addStep());
+      document.getElementById('btn-step-del').addEventListener('click', () => playbook.deleteStep());
+      document.getElementById('btn-play-animate').addEventListener('click', () => playbook.animate());
+      document.getElementById('step-note').addEventListener('input', (e) => playbook.setNote(e.target.value));
+    }
+
+    function renderPlaySelect() {
+      const sel = document.getElementById('play-select');
+      sel.innerHTML = '<option value="">— Nova jogada —</option>' +
+        plays.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+      sel.value = currentPlayId;
+    }
+
+    window.loadSelectedPlay = function() {
+      const id = document.getElementById('play-select').value;
+      currentPlayId = id;
+      const p = plays.find(x => x.id === id);
+      if (!p) {
+        document.getElementById('play-name').value = '';
+        playbook.newDrawing();
+        return;
+      }
+      document.getElementById('play-name').value = p.name;
+      document.getElementById('play-category').value = p.category || 'offense';
+      playbook.loadSteps(p.steps);
+    };
+
+    document.getElementById('btn-save-play').addEventListener('click', async () => {
+      const name = document.getElementById('play-name').value.trim();
+      if (!name) { showToast('Dê um nome à jogada.', 'error'); return; }
+      const { steps } = playbook.getState();
+      const btn = document.getElementById('btn-save-play');
+      setLoading(btn, true);
+      try {
+        const saved = await savePlay(team.id, {
+          id: currentPlayId || null, name,
+          category: document.getElementById('play-category').value, steps,
+        });
+        currentPlayId = saved.id;
+        plays = await getPlays(team.id);
+        renderPlaySelect();
+        showToast('Jogada salva!', 'success');
+      } catch (err) {
+        showToast(err.message || 'Erro ao salvar jogada.', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+
+    document.getElementById('btn-delete-play').addEventListener('click', async () => {
+      if (!currentPlayId) { showToast('Nenhuma jogada carregada.', ''); return; }
+      if (!confirm('Excluir esta jogada?')) return;
+      try {
+        await deletePlay(currentPlayId);
+        currentPlayId = '';
+        document.getElementById('play-name').value = '';
+        playbook.newDrawing();
+        plays = await getPlays(team.id);
+        renderPlaySelect();
+        showToast('Jogada excluída.', '');
+      } catch (err) {
+        showToast('Erro ao excluir.', 'error');
+      }
+    });
+
+    // ============================================================
+    // EVOLUÇÃO
+    // ============================================================
     async function loadEvolution() {
       const games = await getGames(team.id);
       const finished = games.filter(g => g.status === 'finished');
       const wins = finished.filter(g => g.our_score > g.opp_score).length;
-      const losses = finished.length - wins;
+      const losses = finished.filter(g => g.opp_score != null && g.our_score <= g.opp_score).length;
       document.getElementById('record-w').textContent = wins;
       document.getElementById('record-l').textContent = losses;
 
+      const charts = ['chart-pts','chart-fg','chart-reb','chart-ast','chart-vol','chart-diff'];
+      charts.forEach(id => document.getElementById(id).innerHTML = '');
+
       if (finished.length === 0) {
-        document.getElementById('avg-pts').textContent = '—';
-        document.getElementById('avg-reb').textContent = '—';
-        document.getElementById('avg-ast').textContent = '—';
-        document.getElementById('avg-stl').textContent = '—';
+        ['avg-pts','avg-reb','avg-ast','avg-stl'].forEach(id => document.getElementById(id).textContent = '—');
+        charts.forEach(id => document.getElementById(id).innerHTML = '<div class="text-muted text-sm">Sem jogos finalizados.</div>');
         return;
       }
 
-      // Carregar eventos de todos os jogos finalizados
-      const allStats = [];
+      // ordem cronológica para evolução (mais antigo → mais novo)
+      const ordered = [...finished].sort((a, b) => new Date(a.date) - new Date(b.date));
       let totPts = 0, totReb = 0, totAst = 0, totStl = 0;
-      const chartPts = document.getElementById('chart-pts');
-      const chartFg = document.getElementById('chart-fg');
-      chartPts.innerHTML = '';
-      chartFg.innerHTML = '';
-
-      const gameDataList = [];
-      for (const g of finished) {
+      const rows = [];
+      for (const g of ordered) {
         const events = await getGameEvents(g.id);
         const pts = calcTeamScore(events);
-        const st = calcPlayerStats(events); // para reb, ast, stl, fgPct do time
-        gameDataList.push({ g, pts, st });
+        const st = calcPlayerStats(events);
+        const diff = g.opp_score != null ? pts - g.opp_score : pts;
+        rows.push({ g, pts, st, diff });
         totPts += pts; totReb += st.reb; totAst += st.ast; totStl += st.stl;
       }
 
-      const maxPts = Math.max(...gameDataList.map(d => d.pts), 1);
-      for (const { g, pts, st } of gameDataList) {
-        const label = new Date(g.date).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
-        chartPts.innerHTML += barRow(label, pts, maxPts, 'var(--accent)');
-        chartFg.innerHTML += barRow(label, st.fgPct, 100, 'var(--green)');
+      const label = g => new Date(g.date).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
+      const maxOf = sel => Math.max(...rows.map(sel), 1);
+
+      const maxPts = maxOf(r => r.pts);
+      const maxReb = maxOf(r => r.st.reb);
+      const maxAst = maxOf(r => r.st.ast);
+      const maxVol = maxOf(r => r.st.fgAtt);
+      const maxDiff = Math.max(...rows.map(r => Math.abs(r.diff)), 1);
+
+      for (const r of rows) {
+        document.getElementById('chart-pts').innerHTML += barRow(label(r.g), r.pts, maxPts, 'var(--accent)');
+        document.getElementById('chart-fg').innerHTML  += barRow(label(r.g), r.st.fgPct, 100, 'var(--green)', '%');
+        document.getElementById('chart-reb').innerHTML += barRow(label(r.g), r.st.reb, maxReb, '#3b82f6');
+        document.getElementById('chart-ast').innerHTML += barRow(label(r.g), r.st.ast, maxAst, '#a855f7');
+        document.getElementById('chart-vol').innerHTML += barRow(label(r.g), r.st.fgAtt, maxVol, '#f59e0b');
+        const dColor = r.diff >= 0 ? 'var(--green)' : 'var(--red)';
+        const dPct = Math.round(Math.abs(r.diff) / maxDiff * 100);
+        document.getElementById('chart-diff').innerHTML += `<div class="bar-row">
+          <div class="bar-label">${label(r.g)}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${dPct}%;background:${dColor}"></div></div>
+          <div class="bar-value">${r.diff >= 0 ? '+' : ''}${r.diff}</div>
+        </div>`;
       }
 
       const n = finished.length;
@@ -396,12 +676,12 @@
       document.getElementById('avg-stl').textContent = (totStl/n).toFixed(1);
     }
 
-    function barRow(label, value, max, color) {
+    function barRow(label, value, max, color, suffix = '') {
       const pct = Math.round(value / max * 100);
       return `<div class="bar-row">
         <div class="bar-label">${label}</div>
         <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
-        <div class="bar-value">${value}</div>
+        <div class="bar-value">${value}${suffix}</div>
       </div>`;
     }
 

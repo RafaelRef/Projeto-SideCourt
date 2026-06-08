@@ -52,6 +52,11 @@ export async function updateGame(gameId, updates) {
   return data;
 }
 
+export async function deleteGame(gameId) {
+  const { error } = await supabase.from('games').delete().eq('id', gameId);
+  if (error) throw error;
+}
+
 export async function setGamePlayers(gameId, playerIds) {
   // Remove elenco existente e recria
   await supabase.from('game_players').delete().eq('game_id', gameId);

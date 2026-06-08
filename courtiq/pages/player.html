@@ -110,6 +110,12 @@
 
     <!-- Shot chart -->
     <div class="tab-panel" id="tab-shotchart">
+      <div class="form-group mb-2">
+        <label class="form-label">Filtrar por jogo</label>
+        <select class="select" id="sc-game-select" onchange="renderChart()">
+          <option value="all">Geral (todos os jogos)</option>
+        </select>
+      </div>
       <div class="shot-filters">
         <button class="filter-btn active" onclick="setFilter('all')">Todos</button>
         <button class="filter-btn" onclick="setFilter('made')">Certos</button>
@@ -258,8 +264,23 @@
 
       await loadHistory(byGame);
       await loadManualGames(teamId);
+      await loadShotGames(teamId, byGame);
 
       initShotChart(document.getElementById('shotchart-svg'));
+    }
+
+    async function loadShotGames(teamId, byGame) {
+      const games = await getGames(teamId);
+      const gameMap = Object.fromEntries(games.map(g => [g.id, g]));
+      // só jogos em que a atleta tem arremessos com coordenada
+      const gameIds = [...new Set(allEvents.filter(e => e.shot_x != null).map(e => e.game_id))];
+      const select = document.getElementById('sc-game-select');
+      const options = gameIds.map(gid => {
+        const g = gameMap[gid];
+        const label = g ? `${formatDate(g.date)} vs ${g.opponent}` : gid.slice(0, 8);
+        return `<option value="${gid}">${label}</option>`;
+      }).join('');
+      select.innerHTML = `<option value="all">Geral (todos os jogos)</option>` + options;
     }
 
     async function loadHistory(byGame) {
@@ -294,9 +315,11 @@
       }).join('');
     }
 
-    function renderChart() {
+    window.renderChart = function() {
       const svg = document.getElementById('shotchart-svg');
-      const shots = allEvents.filter(e => e.shot_x != null);
+      const gameFilter = document.getElementById('sc-game-select')?.value || 'all';
+      let shots = allEvents.filter(e => e.shot_x != null);
+      if (gameFilter !== 'all') shots = shots.filter(e => e.game_id === gameFilter);
       renderShots(svg, shots, shotFilter, playerId);
       const st = getShotStats(shots, playerId);
       document.getElementById('sc-total').textContent = st.total;

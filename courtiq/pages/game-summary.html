@@ -52,6 +52,18 @@
     .dist-bar-wrap { flex: 1; height: 12px; background: var(--bg3); border-radius: 6px; overflow: hidden; }
     .dist-bar { height: 100%; border-radius: 6px; }
     .dist-val { font-size: 0.82rem; font-weight: 600; width: 32px; }
+
+    /* Shot chart */
+    .shotchart-svg { width: 100%; max-width: 600px; border-radius: 10px; border: 1px solid var(--border); }
+    .shot-filters { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; }
+    .filter-btn {
+      padding: 0.25rem 0.65rem; border-radius: 6px; font-size: 0.78rem; font-weight: 600;
+      background: var(--bg3); border: 1px solid var(--border2); color: var(--muted); cursor: pointer;
+    }
+    .filter-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent2); }
+    .shot-stats-row { display: flex; gap: 1rem; margin-top: 0.5rem; font-size: 0.82rem; }
+    .shot-stat { color: var(--muted); }
+    .shot-stat strong { color: var(--text); }
   </style>
 </head>
 <body>
@@ -74,6 +86,7 @@
     <div class="tabs">
       <button class="tab-btn active" onclick="setTab('boxscore')">Box Score</button>
       <button class="tab-btn" onclick="setTab('team')">Time</button>
+      <button class="tab-btn" onclick="setTab('shots')">Arremessos</button>
     </div>
 
     <!-- Box Score -->
@@ -111,6 +124,31 @@
       <h3 class="mb-2" style="font-size:1rem;font-weight:700;color:var(--muted)">Distribuição de pontos</h3>
       <div id="dist-chart"></div>
     </div>
+
+    <!-- Arremessos -->
+    <div class="tab-panel" id="tab-shots">
+      <div class="form-group mb-2">
+        <label class="form-label">Atleta</label>
+        <select class="select" id="shots-player-select" onchange="renderShotChart()">
+          <option value="all">Todas as atletas</option>
+        </select>
+      </div>
+      <div class="shot-filters">
+        <button class="filter-btn active" onclick="setShotFilter('all')">Todos</button>
+        <button class="filter-btn" onclick="setShotFilter('made')">Certos</button>
+        <button class="filter-btn" onclick="setShotFilter('missed')">Errados</button>
+      </div>
+      <svg class="shotchart-svg" id="game-shotchart" viewBox="0 0 560 300"></svg>
+      <div class="shot-stats-row">
+        <div class="shot-stat">Total: <strong id="gs-total">0</strong></div>
+        <div class="shot-stat">Certos: <strong id="gs-made" style="color:var(--green)">0</strong></div>
+        <div class="shot-stat">Errados: <strong id="gs-missed" style="color:var(--red)">0</strong></div>
+        <div class="shot-stat">FG%: <strong id="gs-pct">0%</strong></div>
+      </div>
+      <div class="text-muted text-sm mt-2" id="shots-empty" style="display:none">
+        Sem arremessos com posição registrada neste jogo. Os pontos do mapa aparecem quando o jogo é registrado pela quadra interativa ou pela análise de vídeo.
+      </div>
+    </div>
   </div>
 
   <script type="module">
@@ -119,13 +157,45 @@
     import { getGameEvents } from '../js/events.js';
     import { calcBoxScore, calcTeamScore, calcScoreByQuarter, calcOppScoreByQuarter, calcPlayerStats } from '../js/stats.js';
     import { getInitials, getQueryParam, pct, formatDate } from '../js/utils.js';
+    import { initShotChart, renderShots, getShotStats } from '../js/shotchart.js';
 
     const gameId = getQueryParam('gameId') || localStorage.getItem('currentGameId');
+    let allEvents = [];
+    let gamePlayersGlobal = [];
+    let shotFilter = 'all';
+    let shotChartReady = false;
 
     window.setTab = function(name) {
-      document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', ['boxscore','team'][i] === name));
+      document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', ['boxscore','team','shots'][i] === name));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.getElementById('tab-' + name).classList.add('active');
+      if (name === 'shots') {
+        if (!shotChartReady) { initShotChart(document.getElementById('game-shotchart')); shotChartReady = true; }
+        renderShotChart();
+      }
+    };
+
+    window.setShotFilter = function(f) {
+      shotFilter = f;
+      document.querySelectorAll('.shot-filters .filter-btn').forEach((b, i) => {
+        b.classList.toggle('active', ['all','made','missed'][i] === f);
+      });
+      renderShotChart();
+    };
+
+    window.renderShotChart = function() {
+      const svg = document.getElementById('game-shotchart');
+      const playerFilter = document.getElementById('shots-player-select').value;
+      let shots = allEvents.filter(e => e.shot_x != null);
+      if (playerFilter !== 'all') shots = shots.filter(e => e.player_id === playerFilter);
+      renderShots(svg, shots, shotFilter, null);
+      const st = getShotStats(shots, playerFilter === 'all' ? null : playerFilter);
+      document.getElementById('gs-total').textContent = st.total;
+      document.getElementById('gs-made').textContent = st.made;
+      document.getElementById('gs-missed').textContent = st.missed;
+      document.getElementById('gs-pct').textContent = st.pct;
+      document.getElementById('shots-empty').style.display =
+        allEvents.some(e => e.shot_x != null) ? 'none' : 'block';
     };
 
     async function init() {
@@ -140,6 +210,17 @@
       ]);
 
       if (!game) { window.location.href = 'games.html'; return; }
+
+      allEvents = events;
+      gamePlayersGlobal = gamePlayers;
+      // popula seletor de atletas (somente as que têm arremesso com posição)
+      const shotPlayerIds = new Set(events.filter(e => e.shot_x != null && e.player_id).map(e => e.player_id));
+      const select = document.getElementById('shots-player-select');
+      select.innerHTML = '<option value="all">Todas as atletas</option>' +
+        gamePlayers
+          .filter(p => shotPlayerIds.has(p.id))
+          .map(p => `<option value="${p.id}">#${p.jersey_number ?? '—'} ${p.name}</option>`)
+          .join('');
 
       const ourScore = game.our_score ?? calcTeamScore(events);
       const oppScore = game.opp_score ?? null;

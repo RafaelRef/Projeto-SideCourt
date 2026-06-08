@@ -45,6 +45,18 @@
     .game-score.win  { color: var(--green); }
     .game-score.loss { color: var(--red); }
     .empty-state { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.9rem; }
+    .game-delete {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-size: 1.2rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0.35rem 0.5rem;
+      border-radius: 8px;
+      transition: color 0.12s, background 0.12s;
+    }
+    .game-delete:hover { color: var(--red); background: var(--bg3); }
   </style>
 </head>
 <body>
@@ -87,7 +99,7 @@
   <script type="module">
     import { requireAuth, signOut } from '../js/auth.js';
     import { getMyTeam } from '../js/team.js';
-    import { getGames } from '../js/games.js';
+    import { getGames, deleteGame } from '../js/games.js';
     import { formatDate, formatTime } from '../js/utils.js';
 
     document.getElementById('btn-logout').addEventListener('click', signOut);
@@ -155,6 +167,7 @@
             <div class="game-meta">${date}${location} ${tournament}</div>
           </div>
           ${scoreHtml}
+          <button class="game-delete" title="Apagar jogo" onclick="event.stopPropagation();removeGame('${game.id}','${game.opponent.replace(/'/g, "\\'")}')">&times;</button>
         </div>
       `;
     }
@@ -167,6 +180,16 @@
     window.goToSummary = function(id) {
       localStorage.setItem('currentGameId', id);
       window.location.href = `game-summary.html?gameId=${id}`;
+    };
+
+    window.removeGame = async function(id, opponent) {
+      if (!confirm(`Apagar o jogo vs ${opponent}? Esta ação remove o jogo e todos os seus dados (estatísticas, elenco). Não pode ser desfeita.`)) return;
+      try {
+        await deleteGame(id);
+        await init();
+      } catch (err) {
+        alert('Erro ao apagar o jogo: ' + (err.message || err));
+      }
     };
 
     init();
