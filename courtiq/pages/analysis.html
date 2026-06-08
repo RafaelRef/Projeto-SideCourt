@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CourtIQ — Análise</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .main { padding: 1.5rem 1.25rem; max-width: 900px; margin: 0 auto; }
+    .page-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 2rem; margin-bottom: 1.25rem; }
+
+    /* Filtros topo */
+    .filter-bar { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .filter-bar label { font-size: 0.82rem; color: var(--muted); }
+
+    /* Avg cards */
+    .avg-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem; margin-bottom: 1.5rem; }
+    @media (max-width: 600px) { .avg-row { grid-template-columns: repeat(3, 1fr); } }
+
+    /* Gráficos */
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem; }
+    @media (max-width: 700px) { .charts-grid { grid-template-columns: 1fr; } }
+    .chart-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+    }
+    .chart-card.full { grid-column: 1 / -1; }
+    .chart-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.75rem; }
+    canvas { max-height: 220px; }
+
+    /* Tabela por jogo */
+    .section-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.6rem; margin-top: 0.25rem; }
+
+    /* Estado vazio */
+    .empty { text-align: center; padding: 3rem 1rem; color: var(--muted); font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a class="navbar-logo" href="games.html">Court<span>IQ</span></a>
+    <div class="navbar-actions">
+      <a class="btn btn-ghost btn-sm" href="scout.html">Scout</a>
+      <a class="btn btn-ghost btn-sm" href="games.html">Jogos</a>
+      <a class="btn btn-ghost btn-sm" href="team.html">Meu Time</a>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="page-title">Análise</div>
+
+    <!-- Filtros -->
+    <div class="filter-bar">
+      <div>
+        <label for="player-select">Atleta</label>
+        <select class="select" id="player-select" style="margin-left:0.4rem">
+          <option value="">Carregando...</option>
+        </select>
+      </div>
+      <div>
+        <label for="scope-select">Escopo</label>
+        <select class="select" id="scope-select" style="margin-left:0.4rem">
+          <option value="all">Todos os jogos</option>
+          <option value="last5">Últimos 5 jogos</option>
+          <option value="last10">Últimos 10 jogos</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Estado vazio inicial -->
+    <div class="empty" id="empty-state">Selecione uma atleta para ver a análise.</div>
+
+    <!-- Conteúdo (oculto até ter atleta) -->
+    <div id="analysis-content" class="hidden">
+
+      <!-- Médias -->
+      <div class="section-label">Médias por jogo</div>
+      <div class="avg-row">
+        <div class="stat-card"><div class="value" id="avg-pts">—</div><div class="label">PTS/j</div></div>
+        <div class="stat-card"><div class="value" id="avg-reb">—</div><div class="label">REB/j</div></div>
+        <div class="stat-card"><div class="value" id="avg-ast">—</div><div class="label">AST/j</div></div>
+        <div class="stat-card"><div class="value" id="avg-stl">—</div><div class="label">ROB/j</div></div>
+        <div class="stat-card"><div class="value" id="avg-fg">—</div><div class="label">FG%</div></div>
+      </div>
+
+      <!-- Gráficos -->
+      <div class="charts-grid">
+        <!-- Pontos por jogo -->
+        <div class="chart-card full">
+          <div class="chart-title">Pontos por jogo</div>
+          <canvas id="chart-pts"></canvas>
+        </div>
+
+        <!-- FG% por jogo -->
+        <div class="chart-card">
+          <div class="chart-title">Aproveitamento de arremesso (%)</div>
+          <canvas id="chart-fg"></canvas>
+        </div>
+
+        <!-- Distribuição de pontos -->
+        <div class="chart-card">
+          <div class="chart-title">Distribuição de pontos</div>
+          <canvas id="chart-dist"></canvas>
+        </div>
+
+        <!-- Rebotes + AST + ROB por jogo -->
+        <div class="chart-card full">
+          <div class="chart-title">Rebotes / Assistências / Roubos por jogo</div>
+          <canvas id="chart-other"></canvas>
+        </div>
+      </div>
+
+      <!-- Tabela histórica -->
+      <div class="section-label">Histórico por jogo</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Jogo</th><th>PTS</th><th>REB</th><th>AST</th><th>ROB</th><th>TOC</th><th>ERR</th><th>FAL</th><th>FG%</th><th>3P%</th><th>LL%</th>
+            </tr>
+          </thead>
+          <tbody id="history-body">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth } from '../js/auth.js';
+    import { getMyTeam, getPlayers } from '../js/team.js';
+    import { getGames } from '../js/games.js';
+    import { getPlayerEvents } from '../js/events.js';
+    import { calcPlayerStats, calcPlayerAverages } from '../js/stats.js';
+    import { formatDate, pct, getQueryParam } from '../js/utils.js';
+
+    let allPlayers = [];
+    let allGames = [];
+    let allEvents = [];
+    let charts = {};
+
+    const playerSelect = document.getElementById('player-select');
+    const scopeSelect  = document.getElementById('scope-select');
+
+    const chartDefaults = {
+      color: '#eef0f5',
+      plugins: { legend: { labels: { color: '#8b93a5', font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: '#8b93a5', font: { size: 10 } }, grid: { color: '#252830' } },
+        y: { ticks: { color: '#8b93a5', font: { size: 10 } }, grid: { color: '#252830' }, beginAtZero: true },
+      },
+    };
+
+    function makeChart(id, type, data, options = {}) {
+      if (charts[id]) charts[id].destroy();
+      const ctx = document.getElementById(id).getContext('2d');
+      charts[id] = new Chart(ctx, { type, data, options: { ...chartDefaults, ...options, plugins: { ...chartDefaults.plugins, ...(options.plugins || {}) } } });
+    }
+
+    playerSelect.addEventListener('change', renderAnalysis);
+    scopeSelect.addEventListener('change', renderAnalysis);
+
+    async function renderAnalysis() {
+      const playerId = playerSelect.value;
+      if (!playerId) {
+        document.getElementById('empty-state').classList.remove('hidden');
+        document.getElementById('analysis-content').classList.add('hidden');
+        return;
+      }
+
+      document.getElementById('empty-state').classList.add('hidden');
+      document.getElementById('analysis-content').classList.remove('hidden');
+
+      // Carregar eventos da atleta se ainda não carregados
+      const existing = allEvents.find(e => e.playerId === playerId);
+      let playerEvents;
+      if (existing) {
+        playerEvents = existing.events;
+      } else {
+        playerEvents = await getPlayerEvents(playerId);
+        allEvents.push({ playerId, events: playerEvents });
+      }
+
+      // Filtrar por escopo
+      const scope = scopeSelect.value;
+      const gameMap = Object.fromEntries(allGames.map(g => [g.id, g]));
+      const finishedGames = allGames
+        .filter(g => g.status === 'finished')
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      let scopedGames = finishedGames;
+      if (scope === 'last5')  scopedGames = finishedGames.slice(0, 5);
+      if (scope === 'last10') scopedGames = finishedGames.slice(0, 10);
+      const scopedIds = new Set(scopedGames.map(g => g.id));
+
+      const scopedEvents = playerEvents.filter(e => scopedIds.has(e.game_id));
+
+      // Agrupar por jogo (ordem cronológica para gráficos)
+      const gamesWithEvents = scopedGames
+        .filter(g => scopedEvents.some(e => e.game_id === g.id))
+        .reverse(); // cronológico para o gráfico
+
+      const byGame = {};
+      scopedEvents.forEach(e => {
+        if (!byGame[e.game_id]) byGame[e.game_id] = [];
+        byGame[e.game_id].push(e);
+      });
+
+      // Médias
+      const avgs = calcPlayerAverages(byGame);
+      if (avgs) {
+        document.getElementById('avg-pts').textContent = avgs.pts;
+        document.getElementById('avg-reb').textContent = avgs.reb;
+        document.getElementById('avg-ast').textContent = avgs.ast;
+        document.getElementById('avg-stl').textContent = avgs.stl;
+        document.getElementById('avg-fg').textContent = avgs.fgPct + '%';
+      } else {
+        ['avg-pts','avg-reb','avg-ast','avg-stl','avg-fg'].forEach(id => { document.getElementById(id).textContent = '—'; });
+      }
+
+      // Dados para gráficos
+      const labels = gamesWithEvents.map(g => `vs ${g.opponent.split(' ')[0]}`);
+      const statsByGame = gamesWithEvents.map(g => calcPlayerStats(byGame[g.id] || []));
+
+      // Gráfico de pontos
+      makeChart('chart-pts', 'line', {
+        labels,
+        datasets: [{
+          label: 'Pontos',
+          data: statsByGame.map(s => s.pts),
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,0.15)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 5,
+          pointBackgroundColor: '#3b82f6',
+        }],
+      });
+
+      // Gráfico FG%
+      makeChart('chart-fg', 'bar', {
+        labels,
+        datasets: [
+          { label: 'FG%', data: statsByGame.map(s => s.fgPct), backgroundColor: '#3b82f6' },
+          { label: '3P%', data: statsByGame.map(s => s.threePct), backgroundColor: '#22c55e' },
+          { label: 'LL%', data: statsByGame.map(s => s.ftPct), backgroundColor: '#f59e0b' },
+        ],
+      }, {
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, max: 100 } },
+      });
+
+      // Distribuição de pontos (donut)
+      const totalPts2  = statsByGame.reduce((a, s) => a + s.fgMade * 0, 0); // calc abaixo
+      const t2Made = statsByGame.reduce((a, s) => a + s.fgMade - s.threeMade, 0);
+      const t3Made = statsByGame.reduce((a, s) => a + s.threeMade, 0);
+      const tFtMade = statsByGame.reduce((a, s) => a + s.ftMade, 0);
+      const distPts2 = t2Made * 2;
+      const distPts3 = t3Made * 3;
+      const distPtsLL = tFtMade;
+      makeChart('chart-dist', 'doughnut', {
+        labels: ['2 Pontos', '3 Pontos', 'Lances Livres'],
+        datasets: [{
+          data: [distPts2, distPts3, distPtsLL],
+          backgroundColor: ['#3b82f6', '#22c55e', '#f59e0b'],
+          borderWidth: 0,
+        }],
+      }, {
+        scales: {},
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#8b93a5', font: { size: 11 }, padding: 12 } },
+        },
+      });
+
+      // Rebotes / AST / ROB
+      makeChart('chart-other', 'bar', {
+        labels,
+        datasets: [
+          { label: 'Rebotes', data: statsByGame.map(s => s.reb), backgroundColor: '#8b5cf6' },
+          { label: 'Assistências', data: statsByGame.map(s => s.ast), backgroundColor: '#06b6d4' },
+          { label: 'Roubos', data: statsByGame.map(s => s.stl), backgroundColor: '#f59e0b' },
+        ],
+      });
+
+      // Tabela histórica
+      const tbody = document.getElementById('history-body');
+      if (!gamesWithEvents.length) {
+        tbody.innerHTML = '<tr><td colspan="11" class="text-muted">Sem dados para este filtro.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = [...gamesWithEvents].reverse().map(g => {
+        const st = calcPlayerStats(byGame[g.id] || []);
+        return `<tr>
+          <td style="white-space:nowrap">${formatDate(g.date)} vs ${g.opponent}</td>
+          <td class="num">${st.pts}</td>
+          <td>${st.reb}</td>
+          <td>${st.ast}</td>
+          <td>${st.stl}</td>
+          <td>${st.blk}</td>
+          <td>${st.to}</td>
+          <td>${st.foul}</td>
+          <td>${pct(st.fgMade, st.fgAtt)}</td>
+          <td>${pct(st.threeMade, st.threeAtt)}</td>
+          <td>${pct(st.ftMade, st.ftAtt)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function init() {
+      const session = await requireAuth();
+      if (!session) return;
+
+      const team = await getMyTeam(session.user.id);
+      if (!team) { window.location.href = '../choose.html'; return; }
+      localStorage.setItem('currentTeamId', team.id);
+
+      [allPlayers, allGames] = await Promise.all([
+        getPlayers(team.id),
+        getGames(team.id),
+      ]);
+
+      const preselect = getQueryParam('playerId') || localStorage.getItem('currentPlayerId');
+      playerSelect.innerHTML = '<option value="">Selecione uma atleta...</option>' +
+        allPlayers.map(p => `<option value="${p.id}" ${p.id === preselect ? 'selected' : ''}>#${p.jersey_number ?? '—'} ${p.name}</option>`).join('');
+
+      if (preselect && allPlayers.find(p => p.id === preselect)) {
+        await renderAnalysis();
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CourtIQ — Analisar Vídeo</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .main { padding: 1.5rem 1.25rem; max-width: 640px; margin: 0 auto; }
+    .page-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 2rem; margin-bottom: 0.25rem; }
+    .page-sub { color: var(--muted); font-size: 0.88rem; margin-bottom: 1.75rem; }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed var(--border2);
+      border-radius: 14px;
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      background: var(--bg2);
+      margin-bottom: 1.25rem;
+    }
+    .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: var(--accent-dim); }
+    .drop-zone.has-file { border-color: var(--green); border-style: solid; }
+    .drop-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    .drop-title { font-weight: 700; font-size: 1rem; margin-bottom: 0.25rem; }
+    .drop-sub { font-size: 0.82rem; color: var(--muted); }
+    .file-selected { font-size: 0.88rem; color: var(--green); font-weight: 600; margin-top: 0.5rem; }
+
+    /* Progresso */
+    .progress-wrap { display: none; margin-top: 1rem; }
+    .progress-wrap.visible { display: block; }
+    .progress-label { font-size: 0.82rem; color: var(--muted); margin-bottom: 0.4rem; display: flex; justify-content: space-between; }
+    .progress-bar-track { height: 8px; background: var(--bg3); border-radius: 4px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.3s; }
+
+    /* Status de análise */
+    .ai-status-box {
+      display: none;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-align: center;
+      margin-top: 1.25rem;
+    }
+    .ai-status-box.visible { display: block; }
+    .ai-spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 0.75rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .ai-status-title { font-weight: 700; font-size: 1rem; margin-bottom: 0.25rem; }
+    .ai-status-sub { font-size: 0.82rem; color: var(--muted); }
+    .ai-status-box.done { border-color: var(--green); }
+    .ai-status-box.error { border-color: var(--red); }
+
+    /* Info cards */
+    .info-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+    }
+    .info-card-title { font-weight: 700; margin-bottom: 0.4rem; font-size: 0.9rem; }
+    .info-card ul { padding-left: 1.1rem; color: var(--muted); }
+    .info-card li { margin-bottom: 0.2rem; }
+
+    /* Players checklist */
+    .players-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-top: 0.5rem; }
+    .player-check {
+      display: flex; align-items: center; gap: 0.4rem;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.4rem 0.6rem; font-size: 0.82rem; cursor: pointer;
+    }
+    .player-check input { accent-color: var(--accent); }
+    .player-check .jersey { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; color: var(--accent); font-size: 0.9rem; min-width: 22px; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a class="navbar-logo" href="games.html">Court<span>IQ</span></a>
+    <div class="navbar-actions">
+      <a class="btn btn-ghost btn-sm" href="analysis.html">Análise</a>
+      <a class="btn btn-ghost btn-sm" href="scout.html">Scout</a>
+      <a class="btn btn-ghost btn-sm" href="games.html">← Jogos</a>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="page-title">Analisar com IA</div>
+    <div class="page-sub">Faça upload de um vídeo do jogo. A IA identificará todos os lances automaticamente.</div>
+
+    <!-- Selecionar jogo -->
+    <div class="form-group mb-3">
+      <label class="form-label">Jogo</label>
+      <select class="select" id="game-select">
+        <option value="">Carregando jogos...</option>
+      </select>
+    </div>
+
+    <!-- Drop zone -->
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="drop-icon">🎬</div>
+      <div class="drop-title">Arraste o vídeo aqui ou clique para selecionar</div>
+      <div class="drop-sub">MP4, MOV ou AVI · Máximo 500 MB</div>
+      <div class="file-selected hidden" id="file-name"></div>
+    </div>
+    <input type="file" id="file-input" accept="video/mp4,video/quicktime,video/x-msvideo,.mp4,.mov,.avi" style="display:none" />
+
+    <!-- Info sobre o elenco em quadra -->
+    <div class="info-card">
+      <div class="info-card-title">Quem está no vídeo?</div>
+      <div class="form-label" style="margin-bottom:0.4rem;font-size:0.8rem">Marque as atletas que aparecem neste jogo:</div>
+      <div class="players-grid" id="players-grid">
+        <div class="text-muted" style="font-size:0.82rem">Selecione um jogo acima.</div>
+      </div>
+    </div>
+
+    <!-- Dicas para melhor resultado -->
+    <div class="info-card">
+      <div class="info-card-title">Dicas para melhor resultado</div>
+      <ul>
+        <li>Câmera posicionada de frente para a quadra</li>
+        <li>Números de camisa visíveis</li>
+        <li>Iluminação adequada</li>
+        <li>A IA é mais precisa em pontos, arremessos e rebotes</li>
+      </ul>
+    </div>
+
+    <div class="form-error" id="upload-error"></div>
+
+    <button class="btn btn-primary btn-full" id="btn-analyze" disabled>
+      Analisar com IA
+    </button>
+
+    <!-- Progresso do upload -->
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-label">
+        <span id="progress-label-text">Enviando vídeo...</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progress-bar" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- Status da análise -->
+    <div class="ai-status-box" id="ai-status-box">
+      <div class="ai-spinner" id="ai-spinner"></div>
+      <div class="ai-status-title" id="ai-status-title">Analisando vídeo...</div>
+      <div class="ai-status-sub" id="ai-status-sub">A IA está identificando os lances. Isso pode levar alguns minutos.</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth } from '../js/auth.js';
+    import { getMyTeam, getPlayers } from '../js/team.js';
+    import { getGames } from '../js/games.js';
+    import { uploadAndAnalyze, pollAnalysisStatus } from '../js/ai-analysis.js';
+    import { getQueryParam, formatDate, showToast } from '../js/utils.js';
+
+    let selectedFile = null;
+    let teamId = null;
+    let gamePlayers = [];
+    let stopPolling = null;
+
+    const dropZone   = document.getElementById('drop-zone');
+    const fileInput  = document.getElementById('file-input');
+    const fileNameEl = document.getElementById('file-name');
+    const btnAnalyze = document.getElementById('btn-analyze');
+    const gameSelect = document.getElementById('game-select');
+    const errEl      = document.getElementById('upload-error');
+
+    // Drag & drop
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) setFile(file);
+    });
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) setFile(fileInput.files[0]);
+    });
+
+    function setFile(file) {
+      selectedFile = file;
+      fileNameEl.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+      fileNameEl.classList.remove('hidden');
+      dropZone.classList.add('has-file');
+      checkReady();
+    }
+
+    gameSelect.addEventListener('change', async () => {
+      const gameId = gameSelect.value;
+      checkReady();
+      if (!gameId) {
+        document.getElementById('players-grid').innerHTML = '<div class="text-muted" style="font-size:0.82rem">Selecione um jogo acima.</div>';
+        return;
+      }
+      await loadGamePlayers(gameId);
+    });
+
+    function checkReady() {
+      btnAnalyze.disabled = !(selectedFile && gameSelect.value);
+    }
+
+    async function loadGamePlayers(gameId) {
+      const { getGamePlayers } = await import('../js/games.js');
+      gamePlayers = await getGamePlayers(gameId);
+      const grid = document.getElementById('players-grid');
+      if (!gamePlayers.length) {
+        grid.innerHTML = '<div class="text-muted" style="font-size:0.82rem">Nenhuma atleta escalada para este jogo.</div>';
+        return;
+      }
+      grid.innerHTML = gamePlayers.map(p => `
+        <label class="player-check">
+          <input type="checkbox" value="${p.id}" checked />
+          <span class="jersey">#${p.jersey_number ?? '?'}</span>
+          <span>${p.name.split(' ')[0]}</span>
+        </label>
+      `).join('');
+    }
+
+    btnAnalyze.addEventListener('click', async () => {
+      errEl.textContent = '';
+      const gameId = gameSelect.value;
+      if (!gameId || !selectedFile) return;
+
+      // Coletar atletas selecionadas
+      const checkedIds = new Set(
+        [...document.querySelectorAll('#players-grid input:checked')].map(el => el.value)
+      );
+      const activePlayers = gamePlayers
+        .filter(p => checkedIds.has(p.id))
+        .map(p => ({ id: p.id, jersey_number: p.jersey_number, name: p.name }));
+
+      btnAnalyze.disabled = true;
+      btnAnalyze.textContent = 'Enviando...';
+      showProgress(true, 'Enviando vídeo...', 0);
+
+      try {
+        await uploadAndAnalyze({
+          gameId,
+          teamId,
+          file: selectedFile,
+          players: activePlayers,
+          onProgress: (stage, pct) => {
+            if (stage === 'upload') {
+              showProgress(true, 'Enviando vídeo...', pct);
+            }
+          },
+        });
+
+        // Upload concluído — iniciar polling
+        showProgress(false);
+        showAiStatus('processing');
+
+        stopPolling = pollAnalysisStatus(gameId, {
+          onDone: () => {
+            showAiStatus('done');
+            setTimeout(() => {
+              window.location.href = `game-summary.html?gameId=${gameId}`;
+            }, 2000);
+          },
+          onError: (msg) => {
+            showAiStatus('error', msg);
+            btnAnalyze.disabled = false;
+            btnAnalyze.textContent = 'Tentar novamente';
+          },
+        });
+
+      } catch (err) {
+        errEl.textContent = err.message;
+        showProgress(false);
+        showAiStatus(null);
+        btnAnalyze.disabled = false;
+        btnAnalyze.textContent = 'Analisar com IA';
+      }
+    });
+
+    function showProgress(visible, label = '', pct = 0) {
+      const wrap = document.getElementById('progress-wrap');
+      wrap.classList.toggle('visible', visible);
+      document.getElementById('progress-label-text').textContent = label;
+      document.getElementById('progress-pct').textContent = pct + '%';
+      document.getElementById('progress-bar').style.width = pct + '%';
+    }
+
+    function showAiStatus(state, errorMsg = '') {
+      const box = document.getElementById('ai-status-box');
+      const spinner = document.getElementById('ai-spinner');
+      const title = document.getElementById('ai-status-title');
+      const sub = document.getElementById('ai-status-sub');
+
+      if (!state) { box.classList.remove('visible', 'done', 'error'); return; }
+
+      box.classList.add('visible');
+      box.classList.remove('done', 'error');
+
+      if (state === 'processing') {
+        spinner.style.display = '';
+        title.textContent = 'Analisando vídeo...';
+        sub.textContent = 'A IA está identificando os lances. Isso pode levar alguns minutos.';
+      } else if (state === 'done') {
+        box.classList.add('done');
+        spinner.style.display = 'none';
+        title.textContent = '✓ Análise concluída!';
+        sub.textContent = 'Redirecionando para o resumo do jogo...';
+      } else if (state === 'error') {
+        box.classList.add('error');
+        spinner.style.display = 'none';
+        title.textContent = 'Erro na análise';
+        sub.textContent = errorMsg || 'Tente novamente ou insira os dados manualmente.';
+      }
+    }
+
+    async function init() {
+      const session = await requireAuth();
+      if (!session) return;
+
+      const team = await getMyTeam(session.user.id);
+      if (!team) { window.location.href = '../choose.html'; return; }
+      teamId = team.id;
+      localStorage.setItem('currentTeamId', team.id);
+
+      const games = await getGames(team.id);
+      const preselect = getQueryParam('gameId');
+
+      gameSelect.innerHTML = '<option value="">Selecione o jogo...</option>' +
+        games.map(g => {
+          const label = `${formatDate(g.date)} vs ${g.opponent}${g.tournament ? ' · ' + g.tournament : ''}`;
+          const status = g.ai_status === 'done' ? ' ✓IA' : g.ai_status === 'processing' ? ' ⏳' : '';
+          return `<option value="${g.id}" ${g.id === preselect ? 'selected' : ''}>${label}${status}</option>`;
+        }).join('');
+
+      if (preselect) {
+        await loadGamePlayers(preselect);
+        checkReady();
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

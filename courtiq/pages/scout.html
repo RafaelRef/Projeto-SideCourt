@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CourtIQ — Scout</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .main { padding: 1.5rem 1.25rem; max-width: 900px; margin: 0 auto; }
+    .page-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 2rem; margin-bottom: 0.25rem; }
+    .page-sub { color: var(--muted); font-size: 0.88rem; margin-bottom: 1.5rem; }
+
+    /* Record badge */
+    .record-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .record-score {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 800;
+      font-size: 2.8rem;
+      line-height: 1;
+    }
+    .record-score .wins  { color: var(--green); }
+    .record-score .sep   { color: var(--muted); font-size: 2rem; margin: 0 0.2rem; }
+    .record-score .losses { color: var(--red); }
+    .record-meta { color: var(--muted); font-size: 0.85rem; margin-top: 0.2rem; }
+
+    /* Abas */
+    .section-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.6rem; margin-top: 0; }
+
+    /* Head-to-head comparison */
+    .hth-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 0.5rem; align-items: center; margin-bottom: 1.25rem; }
+    .hth-team { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    .hth-team.ours  { color: var(--accent2); text-align: left; }
+    .hth-team.theirs { color: var(--muted); text-align: right; }
+    .hth-row {
+      display: grid;
+      grid-template-columns: 1fr 80px 1fr;
+      gap: 0.5rem;
+      align-items: center;
+      padding: 0.4rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .hth-val { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.3rem; }
+    .hth-val.ours   { color: var(--text); text-align: left; }
+    .hth-val.theirs { color: var(--muted2); text-align: right; }
+    .hth-label { font-size: 0.75rem; color: var(--muted); text-align: center; }
+    .hth-bar-wrap { position: relative; height: 6px; border-radius: 3px; overflow: hidden; background: var(--bg3); margin: 0 0.25rem; }
+    .hth-bar-our  { position: absolute; top: 0; left: 0; height: 100%; background: var(--accent); border-radius: 3px; }
+    .hth-bar-theirs { position: absolute; top: 0; right: 0; height: 100%; background: var(--muted); border-radius: 3px; }
+
+    /* Jogadores adversários */
+    .opp-players-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem; }
+    .opp-player-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.9rem;
+    }
+    .opp-jersey { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.6rem; color: var(--accent); line-height: 1; }
+    .opp-mini-stats { display: flex; gap: 0.75rem; margin-top: 0.4rem; font-size: 0.78rem; }
+    .opp-stat { color: var(--muted); }
+    .opp-stat strong { color: var(--text); font-family: 'Barlow Condensed', sans-serif; font-weight: 700; }
+
+    /* Histórico de confrontos */
+    .game-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.6rem 0.75rem;
+      border-radius: 8px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      margin-bottom: 0.4rem;
+    }
+    .game-row-meta { font-size: 0.82rem; color: var(--muted); }
+    .game-row-score { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.2rem; }
+    .game-row-score.win  { color: var(--green); }
+    .game-row-score.loss { color: var(--red); }
+
+    /* Empty / loading */
+    .empty { text-align: center; padding: 3rem 1rem; color: var(--muted); font-size: 0.9rem; }
+    .no-data-box { background: var(--bg3); border-radius: 8px; padding: 1rem; text-align: center; color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a class="navbar-logo" href="games.html">Court<span>IQ</span></a>
+    <div class="navbar-actions">
+      <a class="btn btn-ghost btn-sm" href="analysis.html">Análise</a>
+      <a class="btn btn-ghost btn-sm" href="games.html">Jogos</a>
+      <a class="btn btn-ghost btn-sm" href="team.html">Meu Time</a>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="page-title">Scout</div>
+    <div class="page-sub">Compare seu time com os adversários já enfrentados.</div>
+
+    <!-- Seletor de adversário -->
+    <div class="form-group mb-3">
+      <label class="form-label">Adversário</label>
+      <select class="select" id="opp-select">
+        <option value="">Carregando...</option>
+      </select>
+    </div>
+
+    <!-- Estado vazio -->
+    <div class="empty" id="empty-state">Selecione um adversário para ver o scouting.</div>
+
+    <!-- Conteúdo -->
+    <div id="scout-content" class="hidden">
+
+      <!-- Record -->
+      <div class="record-card" id="record-card">
+        <div>
+          <div class="record-score">
+            <span class="wins" id="rec-wins">0</span>
+            <span class="sep">–</span>
+            <span class="losses" id="rec-losses">0</span>
+          </div>
+          <div class="record-meta" id="rec-meta"></div>
+        </div>
+        <a class="btn btn-primary btn-sm" id="btn-new-game-vs" href="#">+ Novo jogo vs este time</a>
+      </div>
+
+      <!-- Abas -->
+      <div class="tabs">
+        <button class="tab-btn active" onclick="setTab('hth')">Head-to-Head</button>
+        <button class="tab-btn" onclick="setTab('players')">Jogadores deles</button>
+        <button class="tab-btn" onclick="setTab('history')">Histórico</button>
+      </div>
+
+      <!-- Head-to-Head -->
+      <div class="tab-panel active" id="tab-hth">
+        <div id="hth-no-data" class="no-data-box hidden">
+          Sem dados de IA para este adversário ainda. Analise um vídeo de confronto para ver as comparações.
+        </div>
+        <div id="hth-content">
+          <div class="hth-grid mb-2">
+            <div class="hth-team ours">Nosso Time</div>
+            <div></div>
+            <div class="hth-team theirs" id="hth-opp-name"></div>
+          </div>
+          <div id="hth-rows"></div>
+        </div>
+      </div>
+
+      <!-- Jogadores adversários -->
+      <div class="tab-panel" id="tab-players">
+        <div id="opp-players-no-data" class="no-data-box hidden">
+          Nenhum dado de jogadores adversários encontrado. Analise um vídeo de confronto para identificá-los automaticamente.
+        </div>
+        <div class="opp-players-grid" id="opp-players-grid"></div>
+      </div>
+
+      <!-- Histórico de confrontos -->
+      <div class="tab-panel" id="tab-history">
+        <div id="history-list"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth } from '../js/auth.js';
+    import { getMyTeam } from '../js/team.js';
+    import { getGames } from '../js/games.js';
+    import { getGameEvents } from '../js/events.js';
+    import { getAllOppEvents } from '../js/events.js';
+    import { groupOppStatsByJersey, getUniqueOpponents, getHeadToHeadRecord, getOurAveragesVs } from '../js/opponents.js';
+    import { calcPlayerStats } from '../js/stats.js';
+    import { formatDate, pct } from '../js/utils.js';
+
+    let allGames = [];
+    let allOurEvents = [];
+    let oppStatsByOpp = {};  // { "Time X": { jersey: stats } }
+
+    window.setTab = function(name) {
+      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', ['hth','players','history'][i] === name);
+      });
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+    };
+
+    const oppSelect = document.getElementById('opp-select');
+    oppSelect.addEventListener('change', renderScout);
+
+    async function renderScout() {
+      const oppName = oppSelect.value;
+      if (!oppName) {
+        document.getElementById('empty-state').classList.remove('hidden');
+        document.getElementById('scout-content').classList.add('hidden');
+        return;
+      }
+
+      document.getElementById('empty-state').classList.add('hidden');
+      document.getElementById('scout-content').classList.remove('hidden');
+
+      // Record
+      const { wins, losses, total, games: confrontos } = getHeadToHeadRecord(allGames, oppName);
+      document.getElementById('rec-wins').textContent   = wins;
+      document.getElementById('rec-losses').textContent = losses;
+      document.getElementById('rec-meta').textContent   = `${total} confronto${total !== 1 ? 's' : ''} registrado${total !== 1 ? 's' : ''}`;
+      document.getElementById('hth-opp-name').textContent = oppName;
+      document.getElementById('btn-new-game-vs').href = `game-new.html?opponent=${encodeURIComponent(oppName)}`;
+
+      // Head-to-Head
+      const ourAvgs = getOurAveragesVs(confrontos, allOurEvents);
+      const oppJerseyStats = oppStatsByOpp[oppName] || {};
+      const hasOppData = Object.keys(oppJerseyStats).length > 0;
+
+      if (!hasOppData || !ourAvgs) {
+        document.getElementById('hth-no-data').classList.remove('hidden');
+        document.getElementById('hth-content').classList.add('hidden');
+      } else {
+        document.getElementById('hth-no-data').classList.add('hidden');
+        document.getElementById('hth-content').classList.remove('hidden');
+
+        // Stats do adversário agregadas (todos os jerseys)
+        const allOppEvents = Object.values(oppJerseyStats);
+        const oppTotals = allOppEvents.reduce((acc, s) => {
+          acc.pts  += s.pts;  acc.reb  += s.reb;
+          acc.ast  += s.ast;  acc.stl  += s.stl;
+          acc.fgMade += s.fgMade; acc.fgAtt += s.fgAtt;
+          return acc;
+        }, { pts: 0, reb: 0, ast: 0, stl: 0, fgMade: 0, fgAtt: 0 });
+        const n = ourAvgs.gamesPlayed || 1;
+        const oppAvg = {
+          pts:   +(oppTotals.pts  / n).toFixed(1),
+          reb:   +(oppTotals.reb  / n).toFixed(1),
+          ast:   +(oppTotals.ast  / n).toFixed(1),
+          stl:   +(oppTotals.stl  / n).toFixed(1),
+          fgPct: oppTotals.fgAtt > 0 ? Math.round(oppTotals.fgMade / oppTotals.fgAtt * 100) : 0,
+        };
+
+        const metrics = [
+          { label: 'Pontos/j',     ourVal: ourAvgs.pts,   theirVal: oppAvg.pts,   higherIsBetter: true },
+          { label: 'Rebotes/j',    ourVal: ourAvgs.reb,   theirVal: oppAvg.reb,   higherIsBetter: true },
+          { label: 'Assistências/j',ourVal: ourAvgs.ast,  theirVal: oppAvg.ast,   higherIsBetter: true },
+          { label: 'Roubos/j',     ourVal: ourAvgs.stl,   theirVal: oppAvg.stl,   higherIsBetter: true },
+          { label: 'FG%',          ourVal: ourAvgs.fgPct, theirVal: oppAvg.fgPct, higherIsBetter: true, suffix: '%' },
+        ];
+
+        document.getElementById('hth-rows').innerHTML = metrics.map(m => {
+          const total = (m.ourVal || 0) + (m.theirVal || 0) || 1;
+          const ourPct   = Math.round((m.ourVal   || 0) / total * 100);
+          const theirPct = Math.round((m.theirVal || 0) / total * 100);
+          const suffix = m.suffix || '';
+          const ourColor   = m.ourVal > m.theirVal ? 'var(--green)' : m.ourVal < m.theirVal ? 'var(--red)' : 'var(--text)';
+          const theirColor = m.theirVal > m.ourVal ? 'var(--red)' : 'var(--muted2)';
+          return `
+            <div class="hth-row">
+              <div class="hth-val ours" style="color:${ourColor}">${m.ourVal}${suffix}</div>
+              <div>
+                <div class="hth-label">${m.label}</div>
+                <div class="hth-bar-wrap">
+                  <div class="hth-bar-our"   style="width:${ourPct}%"></div>
+                  <div class="hth-bar-theirs" style="width:${theirPct}%"></div>
+                </div>
+              </div>
+              <div class="hth-val theirs" style="color:${theirColor};text-align:right">${m.theirVal}${suffix}</div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Jogadores adversários por camisa
+      const jerseys = Object.keys(oppJerseyStats).sort((a, b) => parseInt(a) - parseInt(b));
+      const playersGrid = document.getElementById('opp-players-grid');
+      if (!jerseys.length) {
+        document.getElementById('opp-players-no-data').classList.remove('hidden');
+        playersGrid.innerHTML = '';
+      } else {
+        document.getElementById('opp-players-no-data').classList.add('hidden');
+        playersGrid.innerHTML = jerseys.map(jersey => {
+          const s = oppJerseyStats[jersey];
+          return `
+            <div class="opp-player-card">
+              <div class="opp-jersey">#${jersey}</div>
+              <div class="opp-mini-stats">
+                <div class="opp-stat"><strong>${s.pts}</strong> pts</div>
+                <div class="opp-stat"><strong>${s.reb}</strong> reb</div>
+                <div class="opp-stat"><strong>${s.ast}</strong> ast</div>
+              </div>
+              <div class="opp-mini-stats" style="margin-top:0.2rem">
+                <div class="opp-stat"><strong>${s.stl}</strong> rob</div>
+                <div class="opp-stat"><strong>${pct(s.fgMade, s.fgAtt)}</strong> FG</div>
+                <div class="opp-stat"><strong>${pct(s.threeMade, s.threeAtt)}</strong> 3P</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Histórico de confrontos
+      const histList = document.getElementById('history-list');
+      if (!confrontos.length) {
+        histList.innerHTML = '<div class="empty">Nenhum confronto registrado.</div>';
+      } else {
+        histList.innerHTML = [...confrontos]
+          .sort((a, b) => new Date(b.date) - new Date(a.date))
+          .map(g => {
+            const win = g.our_score != null && g.opp_score != null && g.our_score > g.opp_score;
+            const scoreClass = g.our_score == null ? '' : win ? 'win' : 'loss';
+            const scoreText = g.our_score != null ? `${g.our_score} — ${g.opp_score ?? '?'}` : '—';
+            return `
+              <div class="game-row" onclick="window.location.href='game-summary.html?gameId=${g.id}'" style="cursor:pointer">
+                <div>
+                  <div style="font-weight:600;font-size:0.9rem">${formatDate(g.date)}</div>
+                  <div class="game-row-meta">${g.is_home ? '🏠 Casa' : '✈️ Fora'}${g.tournament ? ' · ' + g.tournament : ''}</div>
+                </div>
+                <div class="game-row-score ${scoreClass}">${scoreText}</div>
+              </div>
+            `;
+          }).join('');
+      }
+    }
+
+    async function init() {
+      const session = await requireAuth();
+      if (!session) return;
+
+      const team = await getMyTeam(session.user.id);
+      if (!team) { window.location.href = '../choose.html'; return; }
+      localStorage.setItem('currentTeamId', team.id);
+
+      allGames = await getGames(team.id);
+
+      // Carregar todos os eventos de adversários (dos jogos finalizados com IA)
+      const { events: oppEventsRaw, games: finishedGames } = await getAllOppEvents(team.id);
+      oppStatsByOpp = groupOppStatsByJersey(oppEventsRaw, finishedGames);
+
+      // Carregar eventos do nosso time para comparação
+      const { getGameEvents } = await import('../js/events.js');
+      const finished = allGames.filter(g => g.status === 'finished');
+      const ourEventsArr = await Promise.all(finished.map(g => getGameEvents(g.id)));
+      allOurEvents = ourEventsArr.flat().filter(e => e.player_id != null);
+
+      // Popular dropdown com adversários únicos
+      const opponents = getUniqueOpponents(allGames);
+      oppSelect.innerHTML = '<option value="">Selecione um adversário...</option>' +
+        opponents.map(opp => {
+          const hasData = Object.keys(oppStatsByOpp[opp] || {}).length > 0;
+          return `<option value="${opp}">${opp}${hasData ? ' ✓' : ''}</option>`;
+        }).join('');
+    }
+
+    init();
+  </script>
+</body>
+</html>
