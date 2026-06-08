@@ -60,13 +60,15 @@ CREATE TABLE game_players (
 CREATE TABLE events (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   game_id    UUID REFERENCES games(id) ON DELETE CASCADE NOT NULL,
-  player_id  UUID REFERENCES players(id) ON DELETE CASCADE NOT NULL,
+  -- player_id é NULL para eventos do adversário (type = 'opp_1pt')
+  player_id  UUID REFERENCES players(id) ON DELETE SET NULL,
   type       TEXT NOT NULL,
   -- Tipos válidos:
   -- Arremessos: '2pt_made' | '2pt_miss' | '3pt_made' | '3pt_miss'
   -- Lances livres: 'ft_made' | 'ft_miss'
   -- Rebotes: 'reb_off' | 'reb_def'
   -- Outros: 'ast' | 'stl' | 'blk' | 'to' | 'foul'
+  -- Adversário: 'opp_1pt' (sem player_id, com quarter para rastrear por período)
   quarter    INT DEFAULT 1,
   shot_x     FLOAT,
   shot_y     FLOAT,
@@ -134,6 +136,12 @@ CREATE POLICY "public_read_teams" ON teams
 
 CREATE POLICY "public_read_finished_games" ON games
   FOR SELECT USING (status = 'finished');
+
+-- ============================================================
+-- MIGRAÇÃO (se o banco já existia antes desta versão)
+-- Execute apenas se precisar atualizar um banco existente:
+-- ============================================================
+-- ALTER TABLE events ALTER COLUMN player_id DROP NOT NULL;
 
 -- ============================================================
 -- DADOS DE TESTE (opcional — substitua o user_id real)

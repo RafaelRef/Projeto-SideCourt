@@ -256,8 +256,8 @@
   <script type="module">
     import { requireAuth } from '../js/auth.js';
     import { getGame, getGamePlayers, updateGameStatus, updateGame } from '../js/games.js';
-    import { createEvent, getGameEvents, deleteEvent } from '../js/events.js';
-    import { calcPlayerStats, calcTeamScore } from '../js/stats.js';
+    import { createEvent, createOppEvent, getGameEvents, deleteEvent } from '../js/events.js';
+    import { calcPlayerStats, calcTeamScore, calcOppScore } from '../js/stats.js';
     import { initShotChart, activateShotMode, deactivateShotMode, addShot, renderShots, getShotStats } from '../js/shotchart.js';
     import { getQueryParam, getInitials, showToast } from '../js/utils.js';
 
@@ -270,7 +270,6 @@
     let gameEvents = [];
     let scFilter = 'all';
     let oppScore = 0;
-    let oppScoreSaveTimer = null;
     const svgEl = document.getElementById('sc-svg');
 
     window.setQuarter = function(q) {
@@ -278,14 +277,30 @@
       document.querySelectorAll('.quarter-btn').forEach((b, i) => b.classList.toggle('active', i+1 === q));
     };
 
-    window.changeOppScore = function(delta) {
-      oppScore = Math.max(0, oppScore + delta);
+    window.changeOppScore = async function(delta) {
+      if (delta > 0) {
+        // Cada ponto do adversário vira um evento com o quarto atual
+        try {
+          const ev = await createOppEvent(gameId, currentQuarter);
+          gameEvents.push(ev);
+        } catch (err) {
+          showToast('Erro ao registrar ponto adversário.', 'error');
+          return;
+        }
+      } else {
+        // Desfaz o último ponto do adversário deletando o evento mais recente
+        const lastOpp = [...gameEvents].reverse().find(e => e.type === 'opp_1pt');
+        if (!lastOpp) return;
+        try {
+          await deleteEvent(lastOpp.id);
+          gameEvents.splice(gameEvents.indexOf(lastOpp), 1);
+        } catch (err) {
+          showToast('Erro ao remover ponto adversário.', 'error');
+          return;
+        }
+      }
+      oppScore = calcOppScore(gameEvents);
       document.getElementById('score-opp').textContent = oppScore;
-      // Auto-salvar com debounce de 1s para não gerar chamadas excessivas
-      clearTimeout(oppScoreSaveTimer);
-      oppScoreSaveTimer = setTimeout(() => {
-        updateGame(gameId, { opp_score: oppScore }).catch(() => {});
-      }, 1000);
     };
 
     window.toggleSidebar = function() {
@@ -337,12 +352,13 @@
     };
 
     window.undoLast = async function() {
-      const last = gameEvents.at(-1);
+      // Pega o último evento que não seja de adversário (os de adversário têm botão próprio)
+      const last = [...gameEvents].reverse().find(e => e.type !== 'opp_1pt');
       if (!last) return;
       if (!confirm('Remover o último evento registrado?')) return;
       try {
         await deleteEvent(last.id);
-        gameEvents.pop();
+        gameEvents.splice(gameEvents.indexOf(last), 1);
         updateScoreboard();
         updateSidebarStats();
         const shots = gameEvents.filter(e => e.shot_x != null);
@@ -408,7 +424,8 @@
       if (!confirm('Encerrar o jogo?')) return;
       try {
         const ourScore = calcTeamScore(gameEvents);
-        await updateGame(gameId, { status: 'finished', our_score: ourScore, opp_score: oppScore });
+        const finalOppScore = calcOppScore(gameEvents) || oppScore;
+        await updateGame(gameId, { status: 'finished', our_score: ourScore, opp_score: finalOppScore });
         window.location.href = `game-summary.html?gameId=${gameId}`;
       } catch (err) {
         showToast('Erro ao encerrar jogo.', 'error');
@@ -436,14 +453,13 @@
       document.getElementById('opp-label').textContent = game.opponent.split(' ')[0];
       document.title = `CourtIQ — vs ${game.opponent}`;
 
-      // Restaurar placar do adversário se o jogo já havia sido salvo
-      if (game.opp_score != null) {
-        oppScore = game.opp_score;
-        document.getElementById('score-opp').textContent = oppScore;
-      }
-
       gamePlayers = await getGamePlayers(gameId);
       gameEvents = await getGameEvents(gameId);
+
+      // Restaurar placar do adversário: prioriza eventos opp_1pt (têm info por quarto),
+      // cai no campo opp_score do banco para jogos registrados antes dessa versão
+      oppScore = calcOppScore(gameEvents) || (game.opp_score ?? 0);
+      document.getElementById('score-opp').textContent = oppScore;
 
       renderSidebarPlayers();
       updateScoreboard();

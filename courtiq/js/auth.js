@@ -1,15 +1,12 @@
 import { supabase } from './supabase-client.js';
 
-// Detecta o caminho raiz relativo à página atual
+// Caminho para o diretório raiz (onde ficam index.html e choose.html)
 // Funciona tanto com file:// (local) quanto com servidor (Netlify)
-function rootPath() {
-  return window.location.pathname.includes('/pages/') ? '../' : './';
-}
+const BASE = window.location.pathname.includes('/pages/') ? '../' : './';
 
 export async function signIn(email, password) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
-  localStorage.setItem('currentUserId', data.user.id);
   return data;
 }
 
@@ -21,20 +18,19 @@ export async function signUp(email, password) {
 
 export async function signOut() {
   await supabase.auth.signOut();
-  localStorage.removeItem('currentUserId');
+  // Limpa contexto de navegação (team/game/player são estado de UI, não de auth)
   localStorage.removeItem('currentTeamId');
   localStorage.removeItem('currentGameId');
   localStorage.removeItem('currentPlayerId');
-  window.location.href = rootPath() + 'index.html';
+  window.location.href = BASE + 'index.html';
 }
 
 export async function requireAuth() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
-    window.location.href = rootPath() + 'index.html';
+    window.location.href = BASE + 'index.html';
     return null;
   }
-  localStorage.setItem('currentUserId', session.user.id);
   return session;
 }
 
@@ -46,6 +42,6 @@ export async function getCurrentUser() {
 export async function redirectIfLoggedIn() {
   const { data: { session } } = await supabase.auth.getSession();
   if (session) {
-    window.location.href = rootPath() + 'choose.html';
+    window.location.href = BASE + 'choose.html';
   }
 }

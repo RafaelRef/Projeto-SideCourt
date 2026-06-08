@@ -79,3 +79,18 @@ export function calcScoreByQuarter(events) {
   });
   return quarters;
 }
+
+// Soma total de pontos do adversário a partir dos eventos opp_1pt
+export function calcOppScore(events) {
+  return (events || []).filter(e => e.type === 'opp_1pt').length;
+}
+
+// Pontos do adversário por quarto (cada evento opp_1pt = 1 ponto)
+export function calcOppScoreByQuarter(events) {
+  const quarters = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  (events || []).filter(e => e.type === 'opp_1pt').forEach(e => {
+    const q = e.quarter || 1;
+    quarters[q] += 1;
+  });
+  return quarters;
+}

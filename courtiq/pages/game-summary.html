@@ -100,7 +100,10 @@
         </div>
       </div>
 
-      <h3 class="mb-2" style="font-size:1rem;font-weight:700;color:var(--muted)">Pontos por quarto</h3>
+      <div style="display:flex;align-items:baseline;gap:0.5rem;margin-bottom:0.5rem">
+        <h3 style="font-size:1rem;font-weight:700;color:var(--muted);margin:0">Pontos por quarto</h3>
+        <span id="quarter-legend" style="display:none;font-size:0.72rem;color:var(--muted)">— seu time <span style="opacity:0.6">/ adversário</span></span>
+      </div>
       <div class="quarter-grid mb-3" id="quarter-grid"></div>
 
       <h3 class="mb-2" style="font-size:1rem;font-weight:700;color:var(--muted)">Distribuição de pontos</h3>
@@ -112,7 +115,7 @@
     import { requireAuth } from '../js/auth.js';
     import { getGame, getGamePlayers } from '../js/games.js';
     import { getGameEvents } from '../js/events.js';
-    import { calcBoxScore, calcTeamScore, calcScoreByQuarter, calcPlayerStats } from '../js/stats.js';
+    import { calcBoxScore, calcTeamScore, calcScoreByQuarter, calcOppScoreByQuarter, calcPlayerStats } from '../js/stats.js';
     import { getInitials, getQueryParam, pct, formatDate } from '../js/utils.js';
 
     const gameId = getQueryParam('gameId') || localStorage.getItem('currentGameId');
@@ -201,12 +204,16 @@
         win === true ? 'VITÓRIA' : win === false ? 'DERROTA' : 'RESULTADO';
       document.getElementById('team-opp-name').textContent = `vs ${game.opponent}`;
 
-      // Por quarto
+      // Por quarto — mostra adversário se houver eventos opp_1pt rastreados
       const byQ = calcScoreByQuarter(events);
+      const oppByQ = calcOppScoreByQuarter(events);
+      const hasOppQuarterData = events.some(e => e.type === 'opp_1pt');
+      if (hasOppQuarterData) document.getElementById('quarter-legend').style.display = '';
       document.getElementById('quarter-grid').innerHTML = [1,2,3,4].map(q => `
         <div class="quarter-card">
           <div class="quarter-label">${q}Q</div>
           <div class="quarter-score">${byQ[q]}</div>
+          ${hasOppQuarterData ? `<div style="font-size:1rem;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:700">${oppByQ[q]}</div>` : ''}
         </div>
       `).join('');
 
