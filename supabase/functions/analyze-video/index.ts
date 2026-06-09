@@ -56,7 +56,6 @@ serve(async (req) => {
     if (dlError) throw new Error(`Erro ao baixar vídeo: ${dlError.message}`);
 
     const videoBytes = await videoData.arrayBuffer();
-    const videoBase64 = btoa(String.fromCharCode(...new Uint8Array(videoBytes)));
 
     // 2. Fazer upload para a API de arquivos do Gemini
     const mimeType = storagePath.endsWith('.mov') ? 'video/quicktime' : 'video/mp4';
@@ -204,8 +203,12 @@ Retorne SOMENTE um JSON válido, sem texto adicional, no formato:
       if (insertErr) throw new Error(`Erro ao inserir eventos: ${insertErr.message}`);
     }
 
-    // 9. Atualizar status do jogo
-    await supabase.from('games').update({ ai_status: 'done' }).eq('id', gameId);
+    // 9. Apagar o vídeo do Storage — só precisamos das estatísticas, não do vídeo.
+    // Mantém o storage grátis (1 GB) livre ao longo da temporada.
+    await supabase.storage.from('videos').remove([storagePath]);
+
+    // 10. Atualizar status do jogo (limpa video_path, já que o vídeo foi removido)
+    await supabase.from('games').update({ ai_status: 'done', video_path: null }).eq('id', gameId);
 
     return new Response(
       JSON.stringify({ success: true, eventsInserted: eventRows.length }),

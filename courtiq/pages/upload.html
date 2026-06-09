@@ -165,7 +165,11 @@
     import { getMyTeam, getPlayers } from '../js/team.js';
     import { getGames } from '../js/games.js';
     import { uploadAndAnalyze, pollAnalysisStatus } from '../js/ai-analysis.js';
+    import { compressVideo } from '../js/video-compress.js';
     import { getQueryParam, formatDate, showToast } from '../js/utils.js';
+
+    // Limite do plano Free do Supabase Storage (50 MB). Acima disso, comprimimos no navegador.
+    const SIZE_LIMIT_BYTES = 50 * 1024 * 1024;
 
     let selectedFile = null;
     let teamId = null;
@@ -246,13 +250,28 @@
 
       btnAnalyze.disabled = true;
       btnAnalyze.textContent = 'Enviando...';
-      showProgress(true, 'Enviando vídeo...', 0);
 
       try {
+        // Se passar do limite do plano Free (50 MB), comprime no navegador antes de subir.
+        // A IA amostra ~1 quadro/s, então 480p/5fps/sem áudio não atrapalha as estatísticas.
+        let fileToUpload = selectedFile;
+        if (selectedFile.size > SIZE_LIMIT_BYTES) {
+          showProgress(true, 'Comprimindo vídeo...', 0);
+          fileToUpload = await compressVideo(selectedFile, {
+            onStatus: (msg) => showProgress(true, msg, 0),
+            onProgress: (stage, pct) => showProgress(
+              true,
+              stage === 'download' ? 'Baixando compressor...' : 'Comprimindo vídeo...',
+              pct,
+            ),
+          });
+        }
+
+        showProgress(true, 'Enviando vídeo...', 0);
         await uploadAndAnalyze({
           gameId,
           teamId,
-          file: selectedFile,
+          file: fileToUpload,
           players: activePlayers,
           onProgress: (stage, pct) => {
             if (stage === 'upload') {

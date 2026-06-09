@@ -1,9 +1,14 @@
 -- ============================================================
--- CourtIQ v4 — Migration
+-- CourtIQ v8 — Migration
 -- Formações nomeadas + Quadro de jogadas (playbook) + Storage do bucket 'videos'
 -- Execute este script no SQL Editor do Supabase
 -- (complementa schema.sql e schema-v2.sql)
 -- 100% idempotente: pode ser re-executado sem erros.
+--
+-- v5/v6/v7/v8: corrige policies de storage — qualifica 'storage.objects.name'
+--     (antes o 'name' não-qualificado resolvia para 'teams.name', pois a
+--      tabela teams também tem coluna name, fazendo a checagem falhar sempre
+--      com "new row violates row-level security policy" no upload).
 -- ============================================================
 
 -- ============================================================
@@ -68,13 +73,20 @@ CREATE INDEX IF NOT EXISTS idx_plays_team   ON plays(team_id);
 -- Sem isto, o upload falha com "new row violates row-level security policy".
 -- O caminho do arquivo é 'teamId/gameId.ext', então a 1ª pasta = team_id.
 -- Cada usuário só acessa vídeos de times que ele possui.
+-- IMPORTANTE: usar 'storage.objects.name' (qualificado) — 'teams' tem coluna
+-- 'name', então 'name' sem qualificar resolveria para o nome do time.
 -- ============================================================
 
--- 5a. Garante que o bucket privado 'videos' existe (idempotente).
--- Se o bucket não existir, o upload falha; criar aqui evita esse problema.
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('videos', 'videos', false)
-ON CONFLICT (id) DO NOTHING;
+-- 5a. Garante que o bucket privado 'videos' existe e aceita arquivos grandes.
+-- file_size_limit = 500 MB (mesmo limite anunciado no app).
+-- Se o bucket não existir, é criado; se já existir, atualiza o limite.
+-- ATENÇÃO: existe também um limite GLOBAL do projeto (Settings → Storage →
+-- "Upload file size limit"). O limite do bucket nunca pode passar do global.
+-- No plano Free o teto é 50 MB — comprima o vídeo antes de subir (a IA só
+-- precisa de ~1 quadro/s, então 480p e fps baixo bastam).
+INSERT INTO storage.buckets (id, name, public, file_size_limit)
+VALUES ('videos', 'videos', false, 524288000)  -- 500 * 1024 * 1024
+ON CONFLICT (id) DO UPDATE SET file_size_limit = EXCLUDED.file_size_limit;
 
 -- 5b. Policies de acesso ao bucket
 DROP POLICY IF EXISTS "videos_team_owner_insert" ON storage.objects;
@@ -88,7 +100,7 @@ CREATE POLICY "videos_team_owner_insert" ON storage.objects
     bucket_id = 'videos'
     AND EXISTS (
       SELECT 1 FROM teams
-      WHERE teams.id::text = (storage.foldername(name))[1]
+      WHERE teams.id::text = (storage.foldername(storage.objects.name))[1]
         AND teams.user_id = auth.uid()
     )
   );
@@ -99,7 +111,7 @@ CREATE POLICY "videos_team_owner_select" ON storage.objects
     bucket_id = 'videos'
     AND EXISTS (
       SELECT 1 FROM teams
-      WHERE teams.id::text = (storage.foldername(name))[1]
+      WHERE teams.id::text = (storage.foldername(storage.objects.name))[1]
         AND teams.user_id = auth.uid()
     )
   );
@@ -110,7 +122,7 @@ CREATE POLICY "videos_team_owner_update" ON storage.objects
     bucket_id = 'videos'
     AND EXISTS (
       SELECT 1 FROM teams
-      WHERE teams.id::text = (storage.foldername(name))[1]
+      WHERE teams.id::text = (storage.foldername(storage.objects.name))[1]
         AND teams.user_id = auth.uid()
     )
   )
@@ -118,7 +130,7 @@ CREATE POLICY "videos_team_owner_update" ON storage.objects
     bucket_id = 'videos'
     AND EXISTS (
       SELECT 1 FROM teams
-      WHERE teams.id::text = (storage.foldername(name))[1]
+      WHERE teams.id::text = (storage.foldername(storage.objects.name))[1]
         AND teams.user_id = auth.uid()
     )
   );
@@ -129,7 +141,7 @@ CREATE POLICY "videos_team_owner_delete" ON storage.objects
     bucket_id = 'videos'
     AND EXISTS (
       SELECT 1 FROM teams
-      WHERE teams.id::text = (storage.foldername(name))[1]
+      WHERE teams.id::text = (storage.foldername(storage.objects.name))[1]
         AND teams.user_id = auth.uid()
     )
   );
