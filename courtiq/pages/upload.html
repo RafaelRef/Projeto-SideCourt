@@ -279,42 +279,39 @@
           },
         });
 
-        // Aguarda o Gemini processar o vídeo internamente (~100s para jogos longos)
-        showProgress(true, 'Aguardando Gemini processar vídeo...', 0);
+        // Aguarda o Gemini processar o vídeo internamente (~2 min para jogos longos)
+        showProgress(true, 'Gemini preparando o vídeo...', 0);
         await new Promise(r => setTimeout(r, 30_000));
 
-        // Fase 2: análise com retry de 15s.
-        // Cada chamada: verifica ACTIVE (1s) ou analisa (~50s) — sem sleep dentro
-        // da função. O frontend aguarda entre tentativas para não bater no
-        // IDLE_TIMEOUT da Edge Function.
-        showProgress(true, 'Analisando com IA...', 0);
-        let retried = 0;
-        while (retried < 20) {
-          const result = await runAnalysis({ gameId, storagePath, geminiFileId, players: activePlayers });
-          if (!result.retryLater) break;
-          retried++;
-          if (retried >= 20) throw new Error('Gemini não processou o vídeo a tempo. Tente novamente mais tarde.');
-          showProgress(true, `Processando vídeo no Gemini... (${retried}/20)`, Math.round(retried / 20 * 80));
-          await new Promise(r => setTimeout(r, 15_000));
+        // Fase 2: a Edge Function analisa o vídeo em trechos de 6 min —
+        // uma chamada por trecho (cada uma 20-60s, dentro do limite de 150s).
+        // retryLater = arquivo ainda não está ACTIVE no Gemini; aguarda 15s.
+        showAiStatus('processing');
+        let chunk = 0;
+        let waits = 0;
+        let totalInserted = 0;
+        while (true) {
+          const result = await runAnalysis({ gameId, storagePath, geminiFileId, players: activePlayers, chunk });
+          if (result.retryLater) {
+            waits++;
+            if (waits > 20) throw new Error('Gemini não processou o vídeo a tempo. Tente novamente mais tarde.');
+            showProgress(true, `Gemini preparando o vídeo... (${waits})`, 0);
+            await new Promise(r => setTimeout(r, 15_000));
+            continue;
+          }
+          totalInserted += result.inserted ?? 0;
+          if (result.done) break;
+          chunk = result.chunk + 1;
+          showProgress(true,
+            `Analisando trecho ${chunk + 1} de ${result.totalChunks}... (${totalInserted} eventos)`,
+            Math.round(chunk / result.totalChunks * 100));
         }
 
-        // Fase 2 concluída — poll detecta 'done' ou 'error' no banco
         showProgress(false);
-        showAiStatus('processing');
-
-        stopPolling = pollAnalysisStatus(gameId, {
-          onDone: () => {
-            showAiStatus('done');
-            setTimeout(() => {
-              window.location.href = `game-summary.html?gameId=${gameId}`;
-            }, 2000);
-          },
-          onError: (msg) => {
-            showAiStatus('error', msg);
-            btnAnalyze.disabled = false;
-            btnAnalyze.textContent = 'Tentar novamente';
-          },
-        });
+        showAiStatus('done');
+        setTimeout(() => {
+          window.location.href = `ai-review.html?gameId=${gameId}`;
+        }, 1500);
 
       } catch (err) {
         errEl.textContent = err.message;

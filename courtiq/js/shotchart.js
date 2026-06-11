@@ -1,31 +1,70 @@
 // CourtIQ — Shot Chart SVG interativo
 // ViewBox: 0 0 560 300 (proporção FIBA 28m x 15m)
 
+// Paleta da quadra — integrada ao design system escuro do app.
+const LINE = '#4d5a78';        // linhas gerais
+const LINE_HI = '#7c8db5';     // linhas de destaque (3pt, círculo central)
+const RIM = '#ff7a3d';         // aro
+const KEY_FILL = 'rgba(59,130,246,0.09)';   // garrafão
+const ARC_FILL = 'rgba(59,130,246,0.04)';   // área de 3pt
+
 const COURT_ELEMENTS = `
 <defs>
-  <pattern id="parquet" width="20" height="20" patternUnits="userSpaceOnUse">
-    <rect width="20" height="20" fill="#7c5c2e"/>
-    <rect width="10" height="10" fill="#8b6834"/>
-    <rect x="10" y="10" width="10" height="10" fill="#8b6834"/>
+  <linearGradient id="courtBg" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#161b29"/>
+    <stop offset="1" stop-color="#0e1119"/>
+  </linearGradient>
+  <radialGradient id="centerGlow" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="rgba(59,130,246,0.16)"/>
+    <stop offset="1" stop-color="rgba(59,130,246,0)"/>
+  </radialGradient>
+  <pattern id="planks" width="28" height="300" patternUnits="userSpaceOnUse">
+    <rect width="28" height="300" fill="none"/>
+    <line x1="0" y1="0" x2="0" y2="300" stroke="rgba(255,255,255,0.025)" stroke-width="1"/>
   </pattern>
+  <filter id="dotGlow" x="-60%" y="-60%" width="220%" height="220%">
+    <feDropShadow dx="0" dy="1" stdDeviation="1.6" flood-color="#000" flood-opacity="0.55"/>
+  </filter>
 </defs>
-<rect width="560" height="300" fill="url(#parquet)"/>
-<rect x="2" y="2" width="556" height="296" fill="none" stroke="#fff" stroke-width="2"/>
-<line x1="280" y1="2" x2="280" y2="298" stroke="#fff" stroke-width="1.5"/>
-<circle cx="280" cy="150" r="36" fill="none" stroke="#fff" stroke-width="1.5"/>
-<circle cx="280" cy="150" r="3" fill="#fff"/>
-<rect x="2" y="87" width="142" height="126" fill="none" stroke="#fff" stroke-width="1.5"/>
-<path d="M 144 87 A 63 63 0 0 1 144 213" fill="none" stroke="#fff" stroke-width="1.5"/>
-<path d="M 2 52 L 60 52 A 195 195 0 0 1 60 248 L 2 248" fill="none" stroke="#fff" stroke-width="1.5"/>
-<rect x="2" y="133" width="8" height="34" fill="none" stroke="#fff" stroke-width="1.5"/>
-<circle cx="36" cy="150" r="9" fill="none" stroke="#ff6b35" stroke-width="2"/>
-<line x1="10" y1="150" x2="27" y2="150" stroke="#ff6b35" stroke-width="1.5"/>
-<rect x="416" y="87" width="142" height="126" fill="none" stroke="#fff" stroke-width="1.5"/>
-<path d="M 416 87 A 63 63 0 0 0 416 213" fill="none" stroke="#fff" stroke-width="1.5"/>
-<path d="M 558 52 L 500 52 A 195 195 0 0 0 500 248 L 558 248" fill="none" stroke="#fff" stroke-width="1.5"/>
-<rect x="550" y="133" width="8" height="34" fill="none" stroke="#fff" stroke-width="1.5"/>
-<circle cx="524" cy="150" r="9" fill="none" stroke="#ff6b35" stroke-width="2"/>
-<line x1="550" y1="150" x2="533" y2="150" stroke="#ff6b35" stroke-width="1.5"/>
+
+<rect width="560" height="300" rx="8" fill="url(#courtBg)"/>
+<rect width="560" height="300" rx="8" fill="url(#planks)"/>
+
+<!-- Áreas de 3 pontos (preenchimento sutil) -->
+<path d="M 2 52 L 60 52 A 195 195 0 0 1 60 248 L 2 248 Z" fill="${ARC_FILL}"/>
+<path d="M 558 52 L 500 52 A 195 195 0 0 0 500 248 L 558 248 Z" fill="${ARC_FILL}"/>
+
+<!-- Brilho central + logo -->
+<circle cx="280" cy="150" r="80" fill="url(#centerGlow)"/>
+<text x="280" y="162" text-anchor="middle" font-family="'Barlow Condensed',sans-serif" font-weight="800"
+  font-size="34" fill="rgba(255,255,255,0.05)" letter-spacing="2">COURTIQ</text>
+
+<!-- Linhas externas e central -->
+<rect x="2" y="2" width="556" height="296" rx="6" fill="none" stroke="${LINE}" stroke-width="2.4"/>
+<line x1="280" y1="2" x2="280" y2="298" stroke="${LINE}" stroke-width="1.6"/>
+<circle cx="280" cy="150" r="36" fill="none" stroke="${LINE_HI}" stroke-width="1.8"/>
+<circle cx="280" cy="150" r="3" fill="${LINE_HI}"/>
+
+<!-- Lado esquerdo (nosso ataque) -->
+<rect x="2" y="87" width="142" height="126" fill="${KEY_FILL}" stroke="${LINE}" stroke-width="1.6"/>
+<path d="M 144 87 A 63 63 0 0 1 144 213" fill="none" stroke="${LINE}" stroke-width="1.6"/>
+<path d="M 144 213 A 63 63 0 0 1 144 87" fill="none" stroke="${LINE}" stroke-width="1.6" stroke-dasharray="5 5"/>
+<path d="M 2 52 L 60 52 A 195 195 0 0 1 60 248 L 2 248" fill="none" stroke="${LINE_HI}" stroke-width="2"/>
+<path d="M 36 127 A 23 23 0 0 1 36 173" fill="none" stroke="${LINE}" stroke-width="1.3"/>
+<rect x="2" y="133" width="6" height="34" fill="none" stroke="${LINE}" stroke-width="1.5"/>
+<line x1="25" y1="135" x2="25" y2="165" stroke="#dfe5f1" stroke-width="2.4"/>
+<circle cx="36" cy="150" r="9" fill="none" stroke="${RIM}" stroke-width="2.2"/>
+
+<!-- Lado direito (adversário) -->
+<rect x="416" y="87" width="142" height="126" fill="${KEY_FILL}" stroke="${LINE}" stroke-width="1.6"/>
+<path d="M 416 87 A 63 63 0 0 0 416 213" fill="none" stroke="${LINE}" stroke-width="1.6"/>
+<path d="M 416 213 A 63 63 0 0 0 416 87" fill="none" stroke="${LINE}" stroke-width="1.6" stroke-dasharray="5 5"/>
+<path d="M 558 52 L 500 52 A 195 195 0 0 0 500 248 L 558 248" fill="none" stroke="${LINE_HI}" stroke-width="2"/>
+<path d="M 524 127 A 23 23 0 0 0 524 173" fill="none" stroke="${LINE}" stroke-width="1.3"/>
+<rect x="552" y="133" width="6" height="34" fill="none" stroke="${LINE}" stroke-width="1.5"/>
+<line x1="535" y1="135" x2="535" y2="165" stroke="#dfe5f1" stroke-width="2.4"/>
+<circle cx="524" cy="150" r="9" fill="none" stroke="${RIM}" stroke-width="2.2"/>
+
 <g id="shot-layer"></g>
 `;
 
@@ -116,7 +155,11 @@ export function renderShots(svgEl, shots, filter = 'all', activePlayerId = null)
     const made = s.type === '2pt_made' || s.type === '3pt_made';
     const isActive = !activePlayerId || s.player_id === activePlayerId;
     const opacity = isActive ? 1 : 0.3;
-    layer.appendChild(makeShotDot(s.shot_x, s.shot_y, made, opacity));
+    const is3 = s.type.startsWith('3');
+    let label = `${made ? 'Cesta' : 'Erro'} de ${is3 ? '3' : '2'}`;
+    if (s.opp_jersey_number != null) label += ` — adversário #${s.opp_jersey_number}`;
+    if (s.ai_desc) label += ` — ${s.ai_desc}`;
+    layer.appendChild(makeShotDot(s.shot_x, s.shot_y, made, opacity, label));
   });
 }
 
@@ -202,32 +245,45 @@ function moveCrosshair(g, x, y) {
   g.querySelector('#ch-v').setAttribute('y2', 300);
 }
 
-function makeShotDot(x, y, made, opacity) {
-  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+function makeShotDot(x, y, made, opacity, label = '') {
+  const NS = 'http://www.w3.org/2000/svg';
+  const g = document.createElementNS(NS, 'g');
   g.style.opacity = opacity;
+  g.setAttribute('filter', 'url(#dotGlow)');
 
-  const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-  circle.setAttribute('cx', x);
-  circle.setAttribute('cy', y);
-  circle.setAttribute('r', '9');
-  circle.setAttribute('fill', made ? '#22c55e' : '#ef4444');
-  circle.setAttribute('stroke', '#fff');
-  circle.setAttribute('stroke-width', '1.5');
-  g.appendChild(circle);
+  if (made) {
+    const circle = document.createElementNS(NS, 'circle');
+    circle.setAttribute('cx', x);
+    circle.setAttribute('cy', y);
+    circle.setAttribute('r', '6.5');
+    circle.setAttribute('fill', '#10b981');
+    circle.setAttribute('stroke', 'rgba(255,255,255,0.9)');
+    circle.setAttribute('stroke-width', '1.4');
+    g.appendChild(circle);
+  } else {
+    // ✕ vermelho com halo escuro para legibilidade sobre as linhas
+    const halo = document.createElementNS(NS, 'circle');
+    halo.setAttribute('cx', x);
+    halo.setAttribute('cy', y);
+    halo.setAttribute('r', '7');
+    halo.setAttribute('fill', 'rgba(0,0,0,0.35)');
+    g.appendChild(halo);
+    const size = 4.6;
+    [[-1, -1, 1, 1], [1, -1, -1, 1]].forEach(([a, b, c, d]) => {
+      const line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', x + a * size); line.setAttribute('y1', y + b * size);
+      line.setAttribute('x2', x + c * size); line.setAttribute('y2', y + d * size);
+      line.setAttribute('stroke', '#f87171');
+      line.setAttribute('stroke-width', '2.6');
+      line.setAttribute('stroke-linecap', 'round');
+      g.appendChild(line);
+    });
+  }
 
-  if (!made) {
-    // X sobre o ponto errado
-    const size = 5;
-    const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line1.setAttribute('x1', x - size); line1.setAttribute('y1', y - size);
-    line1.setAttribute('x2', x + size); line1.setAttribute('y2', y + size);
-    line1.setAttribute('stroke', '#fff'); line1.setAttribute('stroke-width', '2');
-    const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line2.setAttribute('x1', x + size); line2.setAttribute('y1', y - size);
-    line2.setAttribute('x2', x - size); line2.setAttribute('y2', y + size);
-    line2.setAttribute('stroke', '#fff'); line2.setAttribute('stroke-width', '2');
-    g.appendChild(line1);
-    g.appendChild(line2);
+  if (label) {
+    const title = document.createElementNS(NS, 'title');
+    title.textContent = label;
+    g.appendChild(title);
   }
 
   return g;

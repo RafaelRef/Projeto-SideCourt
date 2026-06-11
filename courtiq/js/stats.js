@@ -1,7 +1,13 @@
 // CourtIQ — Cálculo de estatísticas
 
+// Evento pertence ao adversário quando tem opp_jersey_number (análise de vídeo)
+// ou é o contador manual opp_1pt. Tudo que é "nosso" passa por aqui.
+export function isOppEvent(e) {
+  return e.opp_jersey_number != null || e.type === 'opp_1pt';
+}
+
 export function calcPlayerStats(events) {
-  const e = events || [];
+  const e = (events || []).filter(ev => !isOppEvent(ev));
 
   const pts2  = e.filter(ev => ev.type === '2pt_made').length * 2;
   const pts3  = e.filter(ev => ev.type === '3pt_made').length * 3;
@@ -60,37 +66,35 @@ export function calcBoxScore(events, players) {
   .sort((a, b) => b.pts - a.pts);
 }
 
+function eventPoints(e) {
+  if (e.type === '2pt_made') return 2;
+  if (e.type === '3pt_made') return 3;
+  if (e.type === 'ft_made' || e.type === 'opp_1pt') return 1;
+  return 0;
+}
+
 export function calcTeamScore(events) {
-  return events.reduce((pts, e) => {
-    if (e.type === '2pt_made') return pts + 2;
-    if (e.type === '3pt_made') return pts + 3;
-    if (e.type === 'ft_made')  return pts + 1;
-    return pts;
-  }, 0);
+  return (events || []).filter(e => !isOppEvent(e)).reduce((pts, e) => pts + eventPoints(e), 0);
 }
 
 export function calcScoreByQuarter(events) {
   const quarters = { 1: 0, 2: 0, 3: 0, 4: 0 };
-  events.forEach(e => {
-    const q = e.quarter || 1;
-    if (e.type === '2pt_made') quarters[q] += 2;
-    else if (e.type === '3pt_made') quarters[q] += 3;
-    else if (e.type === 'ft_made')  quarters[q] += 1;
+  (events || []).filter(e => !isOppEvent(e)).forEach(e => {
+    quarters[e.quarter || 1] += eventPoints(e);
   });
   return quarters;
 }
 
-// Soma total de pontos do adversário a partir dos eventos opp_1pt
+// Pontos do adversário: opp_1pt (registro manual, 1 pt cada) +
+// cestas tipadas vindas da análise de vídeo (opp_jersey_number preenchido)
 export function calcOppScore(events) {
-  return (events || []).filter(e => e.type === 'opp_1pt').length;
+  return (events || []).filter(isOppEvent).reduce((pts, e) => pts + eventPoints(e), 0);
 }
 
-// Pontos do adversário por quarto (cada evento opp_1pt = 1 ponto)
 export function calcOppScoreByQuarter(events) {
   const quarters = { 1: 0, 2: 0, 3: 0, 4: 0 };
-  (events || []).filter(e => e.type === 'opp_1pt').forEach(e => {
-    const q = e.quarter || 1;
-    quarters[q] += 1;
+  (events || []).filter(isOppEvent).forEach(e => {
+    quarters[e.quarter || 1] += eventPoints(e);
   });
   return quarters;
 }

@@ -50,12 +50,13 @@ export async function uploadVideo({ gameId, teamId, file, players, onProgress })
 }
 
 /**
- * Fase 2: roda o generateContent no Gemini (arquivo já deve estar ACTIVE).
- * Retorna { retryLater: true } se o arquivo ainda não estiver pronto.
+ * Fase 2: analisa UM trecho do vídeo (arquivo já deve estar ACTIVE no Gemini).
+ * Retorna { retryLater: true } se o arquivo ainda não estiver pronto, ou
+ * { done, chunk, totalChunks, inserted } após analisar o trecho.
  */
-export async function runAnalysis({ gameId, storagePath, geminiFileId, players }) {
+export async function runAnalysis({ gameId, storagePath, geminiFileId, players, chunk = 0 }) {
   const { data, error: fnError } = await supabase.functions.invoke(EDGE_FUNCTION, {
-    body: { gameId, storagePath, geminiFileId, players },
+    body: { gameId, storagePath, geminiFileId, players, chunk },
   });
 
   if (fnError) {

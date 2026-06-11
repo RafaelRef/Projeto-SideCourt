@@ -1,23 +1,21 @@
-// CourtIQ — Edge Function: analyze-video (v2 — análise em 2 fases)
+// CourtIQ — Edge Function: analyze-video (v3 — análise em trechos)
 //
-// Por que 2 fases?
-//   Um vídeo de jogo inteiro (~40-90 min, 40-50 MB) demora ~100-110s só para o
-//   Gemini processar internamente (estado PROCESSING → ACTIVE) + ~50s para
-//   generateContent = total > 150s → WORKER_RESOURCE_LIMIT na Edge Function.
-//   A solução é separar: Fase 1 faz o upload e retorna imediatamente; o
-//   frontend aguarda e então aciona a Fase 2 quando o arquivo já está ACTIVE.
+// Arquitetura em fases para caber no limite de 150s da Edge Function:
 //
 //   Fase 1 (sem geminiFileId no body):
 //     – Baixa o vídeo do Storage, faz upload para a Gemini File API.
-//     – Salva o gemini_file_id no banco e retorna { geminiFileId } com 202.
-//     – Termina em ~10s (bem dentro dos 150s).
+//     – Salva o gemini_file_id no banco e retorna { geminiFileId } com 202 (~6s).
 //
-//   Fase 2 (com geminiFileId no body):
-//     – Aguarda o arquivo virar ACTIVE (poll curto; já deve estar pronto).
-//     – Roda generateContent com Gemini 2.5 Flash (sem thinking, baixa resolução
-//       de mídia, 0.5 fps) para extrair eventos.
-//     – Insere eventos no banco, apaga o vídeo do Storage e do Gemini.
-//     – Retorna { retryLater: true } se o arquivo ainda não estiver ACTIVE.
+//   Fase 2 (com geminiFileId + chunk no body) — UMA CHAMADA POR TRECHO:
+//     – Verifica UMA vez se o arquivo está ACTIVE (sem sleep — o IDLE_TIMEOUT
+//       de 150s conta I/O ocioso). Se não estiver, retorna retryLater=true e o
+//       frontend chama de novo em ~15s.
+//     – Analisa só o trecho [chunk*CHUNK_SECONDS, fim do trecho] do vídeo com
+//       videoMetadata.startOffset/endOffset. Trechos curtos permitem resolução
+//       de mídia MAIOR (jersey legível) e respostas rápidas (~20-40s).
+//     – Insere os eventos confiáveis no banco e guarda TUDO que a IA viu em
+//       games.ai_raw (auditoria na página ai-review.html).
+//     – No último trecho: apaga o vídeo do Storage e do Gemini, ai_status=done.
 //
 // Deploy: supabase functions deploy analyze-video
 
@@ -28,8 +26,11 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
 const JSON_HEADERS = { ...corsHeaders, 'Content-Type': 'application/json' };
+
+const CHUNK_SECONDS = 360;        // 6 min por trecho
+const MAX_CHUNKS = 24;            // teto de segurança (~2h24 de vídeo)
+const MIN_CONFIDENCE = 0.5;       // abaixo disso o evento fica só no ai_raw
 
 const VALID_EVENT_TYPES = new Set([
   '2pt_made', '2pt_miss', '3pt_made', '3pt_miss',
@@ -38,24 +39,76 @@ const VALID_EVENT_TYPES = new Set([
   'ast', 'stl', 'blk', 'to', 'foul',
 ]);
 
-// Parseia o JSON retornado pelo Gemini, tolerando truncamento no limite de tokens.
-function parseEvents(text: string): unknown[] {
+const SHOT_TYPES = new Set(['2pt_made', '2pt_miss', '3pt_made', '3pt_miss']);
+
+// Parseia o JSON do Gemini tolerando truncamento no limite de output tokens.
+function parseAiJson(text: string): { live?: boolean; score_seen?: string | null; events?: unknown[] } {
   try {
-    return (JSON.parse(text) as { events?: unknown[] }).events ?? [];
+    return JSON.parse(text);
   } catch {
-    // JSON truncado: recupera eventos completos até o último '}' de nível 1.
     const arrStart = text.indexOf('[');
-    if (arrStart < 0) return [];
-    let depth = 0;
-    let lastClose = -1;
+    if (arrStart < 0) return { events: [] };
+    let depth = 0, lastClose = -1;
     for (let i = arrStart; i < text.length; i++) {
       if (text[i] === '{') depth++;
       else if (text[i] === '}') { depth--; if (depth === 0) lastClose = i; }
     }
-    if (lastClose < 0) return [];
-    try { return JSON.parse('[' + text.slice(arrStart + 1, lastClose + 1) + ']') as unknown[]; }
-    catch { return []; }
+    if (lastClose < 0) return { events: [] };
+    try {
+      return { events: JSON.parse('[' + text.slice(arrStart + 1, lastClose + 1) + ']') };
+    } catch { return { events: [] }; }
   }
+}
+
+// Coordenadas do modelo (sx lateral 0-1, sy distância da linha de fundo 0-1)
+// → SVG da quadra (viewBox 560x300). Nosso time na metade esquerda,
+// adversário espelhado na direita.
+function mapShotCoords(sx: number, sy: number, isOurs: boolean): { x: number; y: number } {
+  const cx = Math.min(1, Math.max(0, sx));
+  const cy = Math.min(1, Math.max(0, sy));
+  const x = isOurs ? 12 + cy * 266 : 548 - cy * 266;
+  const y = 22 + cx * 256;
+  return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+}
+
+function buildPrompt(
+  players: { jersey_number: number; name: string }[],
+  startS: number, endS: number,
+): string {
+  const roster = players.length > 0
+    ? players.map(p => `#${p.jersey_number} ${p.name}`).join(', ')
+    : '(elenco não informado)';
+
+  return `Você é um analista profissional de estatísticas de basquete revisando o vídeo de um jogo universitário feminino.
+
+ANALISE SOMENTE o trecho entre ${startS}s e ${endS}s do vídeo.
+
+NOSSO TIME (elenco): ${roster}
+O time adversário é o outro.
+
+REGRA Nº 1 — SÓ JOGO VALENDO:
+O vídeo pode conter aquecimento, intervalos, pedidos de tempo, conversas e pós-jogo. Registre eventos APENAS quando a partida está oficialmente em andamento: 5x5 em quadra, árbitros apitando, cronômetro/placar correndo, defesa real. Se este trecho não contém jogo valendo, retorne "live": false e lista vazia.
+
+REGRA Nº 2 — NUNCA INVENTE NÚMERO DE CAMISA:
+Só preencha "jersey" se o número estiver CLARAMENTE legível no vídeo. Se não der para ler, use null e reduza "conf". É muito melhor retornar poucos eventos corretos do que muitos errados.
+
+Para cada evento estatístico, retorne:
+- "t": segundo do evento contado do INÍCIO DO VÍDEO COMPLETO (número)
+- "team": "ours" (nosso elenco) ou "opp" (adversário)
+- "jersey": número da camisa (inteiro) ou null se ilegível
+- "type": 2pt_made | 2pt_miss | 3pt_made | 3pt_miss | ft_made | ft_miss | reb_off | reb_def | ast | stl | blk | to | foul
+- "quarter": 1-4 se identificável (placar/contexto), senão null
+- "sx": para arremessos: posição lateral 0.0-1.0 olhando para a cesta atacada (0=esquerda, 1=direita); senão omita
+- "sy": para arremessos: distância da linha de fundo, 0.0=linha de fundo, 1.0=meio da quadra; senão omita
+- "conf": confiança 0.0-1.0 de que o evento e a camisa estão corretos
+- "desc": descrição curta do lance (máx. 12 palavras, em português)
+
+Também retorne:
+- "live": true/false — se há jogo valendo neste trecho
+- "score_seen": se um placar estiver visível no vídeo, o último placar lido como string (ex: "32-28"), senão null
+
+Retorne SOMENTE JSON válido:
+{"live": true, "score_seen": "32-28", "events": [...]}`;
 }
 
 serve(async (req) => {
@@ -73,7 +126,7 @@ serve(async (req) => {
     });
   }
 
-  let gameId: string, storagePath: string;
+  let gameId: string, storagePath: string, chunk: number;
   let players: { id: string; jersey_number: number; name: string }[];
   let geminiFileId: string | null;
 
@@ -83,21 +136,20 @@ serve(async (req) => {
     storagePath = body.storagePath ?? null;
     players = body.players ?? [];
     geminiFileId = body.geminiFileId ?? null;
+    chunk = Number.isInteger(body.chunk) ? body.chunk : 0;
   } catch {
     return new Response(JSON.stringify({ error: 'Payload inválido.' }), {
       status: 400, headers: JSON_HEADERS,
     });
   }
 
-  // ── FASE 1 ────────────────────────────────────────────────────────────────
+  // ── FASE 1: enviar vídeo para a Gemini File API ──────────────────────────
   if (!geminiFileId) {
     try {
-      // 1. Baixar vídeo do Storage
       const { data: videoData, error: dlError } = await supabase.storage
         .from('videos').download(storagePath);
       if (dlError) throw new Error(`Erro ao baixar vídeo: ${dlError.message}`);
 
-      // 2. Upload para Gemini File API (envia Blob direto — sem copiar para memória)
       const mimeType = storagePath.endsWith('.mov') ? 'video/quicktime' : 'video/mp4';
       const uploadRes = await fetch(
         `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_KEY}`,
@@ -113,7 +165,6 @@ serve(async (req) => {
       const gFileName = uploadJson.file?.name; // ex: "files/abc123"
       if (!gFileName) throw new Error('Gemini não retornou nome do arquivo.');
 
-      // 3. Salvar gemini_file_id no banco e marcar como 'uploaded'
       await supabase.from('games')
         .update({ ai_status: 'uploaded', gemini_file_id: gFileName, ai_error: null })
         .eq('id', gameId);
@@ -122,7 +173,6 @@ serve(async (req) => {
         JSON.stringify({ phase: 1, geminiFileId: gFileName }),
         { status: 202, headers: JSON_HEADERS },
       );
-
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       await supabase.from('games').update({ ai_status: 'error', ai_error: msg }).eq('id', gameId);
@@ -130,14 +180,9 @@ serve(async (req) => {
     }
   }
 
-  // ── FASE 2 ────────────────────────────────────────────────────────────────
-  // IMPORTANTE: não há loops com sleep aqui — o IDLE_TIMEOUT da Edge Function
-  // mata a execução após 150s de I/O idle acumulado. A Fase 2 verifica o estado
-  // UMA vez: se não estiver ACTIVE retorna retryLater=true imediatamente (~1s)
-  // e o frontend aguarda + chama novamente. Quando ACTIVE, roda generateContent
-  // (~50s) e retorna. Cada invocação fica bem abaixo do limite de 150s.
+  // ── FASE 2: analisar UM trecho ────────────────────────────────────────────
   try {
-    // 1. Verificar estado ATIVO — uma única requisição, sem sleep.
+    // 1. Estado do arquivo — uma única requisição, sem sleep.
     const fileRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/${geminiFileId}?key=${GEMINI_KEY}`,
     );
@@ -145,7 +190,6 @@ serve(async (req) => {
     const state = (fileInfo.state as string) ?? 'PROCESSING';
 
     if (state !== 'ACTIVE') {
-      // Arquivo ainda processando: frontend aguarda ~15s e chama novamente.
       return new Response(
         JSON.stringify({ retryLater: true, message: 'Vídeo ainda sendo processado pelo Gemini.' }),
         { status: 202, headers: JSON_HEADERS },
@@ -155,28 +199,29 @@ serve(async (req) => {
     const fileUri = fileInfo.uri as string;
     const fileMime = (fileInfo.mimeType as string) ?? 'video/mp4';
 
-    // 2. Montar prompt
-    const rosterInfo = players.length > 0
-      ? `Elenco: ${players.map(p => `#${p.jersey_number}=${p.name}`).join(', ')}`
-      : 'Elenco: não informado (identifique por número de camisa).';
+    // 2. Duração → número de trechos.
+    const vmeta = fileInfo.videoMetadata as Record<string, unknown> | undefined;
+    const durationS = vmeta?.videoDuration
+      ? parseFloat(String(vmeta.videoDuration).replace('s', ''))
+      : CHUNK_SECONDS; // sem metadado: trata como trecho único
+    const totalChunks = Math.min(Math.max(1, Math.ceil(durationS / CHUNK_SECONDS)), MAX_CHUNKS);
 
-    const prompt = `Analise este vídeo de basquete universitário feminino e extraia TODOS os eventos estatísticos.
-${rosterInfo}
+    if (chunk >= totalChunks) {
+      return new Response(JSON.stringify({ done: true, chunk, totalChunks, inserted: 0 }), { headers: JSON_HEADERS });
+    }
 
-Para cada evento retorne um objeto JSON com:
-- "team": "ours" (nosso time) ou "opp" (adversário)
-- "jersey": número da camisa (inteiro)
-- "type": tipo do evento
-- "quarter": quarto (1-4)
-- "shot_x": 0.0-1.0 (só arremessos, senão omita)
-- "shot_y": 0.0-1.0 (só arremessos, senão omita)
+    const startS = chunk * CHUNK_SECONDS;
+    const endS = Math.min(durationS, (chunk + 1) * CHUNK_SECONDS);
 
-Tipos válidos: 2pt_made 2pt_miss 3pt_made 3pt_miss ft_made ft_miss reb_off reb_def ast stl blk to foul
+    // 3. Primeiro trecho: zera análises anteriores deste jogo (re-execução limpa).
+    if (chunk === 0) {
+      await supabase.from('events').delete().eq('game_id', gameId).eq('source', 'ai');
+      await supabase.from('games')
+        .update({ ai_raw: [], ai_progress: { chunk: 0, total: totalChunks }, ai_status: 'processing', ai_error: null })
+        .eq('id', gameId);
+    }
 
-Regras: só registre o que tem certeza; para assistência = quem passou antes da cesta; se não identificar a camisa pule o evento.
-Retorne SOMENTE JSON válido: {"events":[...]}`;
-
-    // 3. Chamar Gemini 2.5 Flash (sem thinking, resolução baixa, 0.5 fps)
+    // 4. Análise do trecho — resolução média (jersey legível) + 1 fps.
     const genRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
       {
@@ -187,90 +232,120 @@ Retorne SOMENTE JSON válido: {"events":[...]}`;
             parts: [
               {
                 fileData: { mimeType: fileMime, fileUri },
-                videoMetadata: { fps: 0.5 },
+                videoMetadata: {
+                  startOffset: `${startS}s`,
+                  endOffset: `${Math.ceil(endS)}s`,
+                  fps: 1,
+                },
               },
-              { text: prompt },
+              { text: buildPrompt(players, startS, Math.ceil(endS)) },
             ],
           }],
           generationConfig: {
             temperature: 0.1,
             responseMimeType: 'application/json',
             thinkingConfig: { thinkingBudget: 0 },
-            mediaResolution: 'MEDIA_RESOLUTION_LOW',
-            // 8000 tokens ≈ 48s de geração (dentro dos 150s de limite da fn).
-            // Para um jogo completo: ~230 eventos × 35 tokens/evento.
-            // Com vídeos mais curtos (por trimestre), aumentar conforme necessário.
+            mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
             maxOutputTokens: 8000,
           },
         }),
       },
     );
-
     if (!genRes.ok) throw new Error(`Gemini generateContent falhou: ${await genRes.text()}`);
     const genJson = await genRes.json();
     const rawText = genJson.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+    const parsed = parseAiJson(rawText);
+    const rawEvents = Array.isArray(parsed.events) ? parsed.events : [];
 
-    // 4. Parsear resposta (tolerante a truncamento)
-    const extractedEvents = parseEvents(rawText);
-
-    // 5. Mapear camisa → player_id
+    // 5. Normaliza e filtra o que entra no banco (o resto fica só no ai_raw).
     const jerseyToPlayerId: Record<number, string> = {};
     players.forEach(p => { jerseyToPlayerId[p.jersey_number] = p.id; });
 
-    // 6. Montar linhas de eventos
     const eventRows: Record<string, unknown>[] = [];
-    for (const ev of extractedEvents) {
+    const auditEvents: Record<string, unknown>[] = [];
+
+    for (const ev of rawEvents) {
       const e = ev as Record<string, unknown>;
-      const type = e.type as string;
-      if (!VALID_EVENT_TYPES.has(type)) continue;
+      const type = String(e.type ?? '');
+      const team = e.team === 'opp' ? 'opp' : 'ours';
+      const jersey = typeof e.jersey === 'number' ? e.jersey
+        : (typeof e.jersey === 'string' && e.jersey !== '' ? parseInt(e.jersey) : null);
+      const conf = typeof e.conf === 'number' ? Math.min(1, Math.max(0, e.conf)) : 0;
+      const quarter = typeof e.quarter === 'number' && e.quarter >= 1 && e.quarter <= 4 ? e.quarter : null;
+      const t = typeof e.t === 'number' ? e.t : null;
+      const desc = typeof e.desc === 'string' ? e.desc.slice(0, 140) : null;
 
-      const jersey = typeof e.jersey === 'number' ? e.jersey : parseInt(e.jersey as string);
-      if (isNaN(jersey)) continue;
+      // Decide se o evento é confiável o bastante para virar estatística.
+      let status = 'ok';
+      if (!VALID_EVENT_TYPES.has(type)) status = 'tipo_invalido';
+      else if (jersey == null || Number.isNaN(jersey)) status = 'camisa_ilegivel';
+      else if (conf < MIN_CONFIDENCE) status = 'baixa_confianca';
+      else if (team === 'ours' && !jerseyToPlayerId[jersey]) status = 'camisa_fora_do_elenco';
 
-      const quarter = typeof e.quarter === 'number' ? Math.min(4, Math.max(1, e.quarter)) : 1;
-      const shotX = typeof e.shot_x === 'number' ? e.shot_x : null;
-      const shotY = typeof e.shot_y === 'number' ? e.shot_y : null;
+      const audit: Record<string, unknown> = { t, team, jersey, type, quarter, conf, desc, status };
+      if (typeof e.sx === 'number') audit.sx = e.sx;
+      if (typeof e.sy === 'number') audit.sy = e.sy;
 
-      const row: Record<string, unknown> = {
-        game_id: gameId, type, quarter,
-        shot_x: shotX, shot_y: shotY,
-        source: 'ai',
-        player_id: null,        // null para eventos de adversários (player_id é nullable)
-        opp_jersey_number: null,
-      };
-      if (e.team === 'ours') {
-        const pid = jerseyToPlayerId[jersey];
-        if (pid) row.player_id = pid;
-        else row.opp_jersey_number = jersey;
-      } else {
-        row.opp_jersey_number = jersey;
+      if (status === 'ok') {
+        const row: Record<string, unknown> = {
+          game_id: gameId, type, quarter,
+          shot_x: null, shot_y: null,
+          source: 'ai',
+          player_id: team === 'ours' ? jerseyToPlayerId[jersey!] : null,
+          opp_jersey_number: team === 'opp' ? jersey : null,
+          video_ts: t,
+          ai_confidence: conf,
+          ai_desc: desc,
+        };
+        if (SHOT_TYPES.has(type) && typeof e.sx === 'number' && typeof e.sy === 'number') {
+          const { x, y } = mapShotCoords(e.sx, e.sy, team === 'ours');
+          row.shot_x = x; row.shot_y = y;
+        }
+        eventRows.push(row);
       }
-      eventRows.push(row);
+      auditEvents.push(audit);
     }
 
-    // 7. Inserir em lotes de 100
+    // 6. Insere em lotes de 100.
     for (let i = 0; i < eventRows.length; i += 100) {
       const { error: insertErr } = await supabase.from('events').insert(eventRows.slice(i, i + 100));
       if (insertErr) throw new Error(`Erro ao inserir eventos: ${insertErr.message}`);
     }
 
-    // 8. Limpar: apagar vídeo do Storage + arquivo do Gemini + atualizar jogo
-    await supabase.storage.from('videos').remove([storagePath]);
-    await fetch(`https://generativelanguage.googleapis.com/v1beta/${geminiFileId}?key=${GEMINI_KEY}`, { method: 'DELETE' });
+    // 7. Acrescenta o trecho ao ai_raw (auditoria) + progresso.
+    const { data: gameRow } = await supabase.from('games').select('ai_raw').eq('id', gameId).single();
+    const aiRaw = Array.isArray(gameRow?.ai_raw) ? gameRow.ai_raw : [];
+    aiRaw.push({
+      chunk, start: startS, end: Math.round(endS),
+      live: parsed.live !== false,
+      score_seen: typeof parsed.score_seen === 'string' ? parsed.score_seen : null,
+      events: auditEvents,
+    });
+
+    const isLast = chunk + 1 >= totalChunks;
     await supabase.from('games')
-      .update({ ai_status: 'done', video_path: null, gemini_file_id: null })
+      .update({ ai_raw: aiRaw, ai_progress: { chunk: chunk + 1, total: totalChunks } })
       .eq('id', gameId);
 
+    // 8. Último trecho: limpeza final.
+    if (isLast) {
+      if (storagePath) await supabase.storage.from('videos').remove([storagePath]);
+      await fetch(`https://generativelanguage.googleapis.com/v1beta/${geminiFileId}?key=${GEMINI_KEY}`, { method: 'DELETE' });
+      await supabase.from('games')
+        .update({ ai_status: 'done', video_path: null, gemini_file_id: null })
+        .eq('id', gameId);
+    }
+
     return new Response(
-      JSON.stringify({ success: true, eventsInserted: eventRows.length }),
+      JSON.stringify({ done: isLast, chunk, totalChunks, inserted: eventRows.length }),
       { headers: JSON_HEADERS },
     );
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await supabase.from('games').update({ ai_status: 'error', ai_error: msg }).eq('id', gameId);
-    // Tenta limpar o arquivo do Gemini mesmo em caso de erro
-    try { await fetch(`https://generativelanguage.googleapis.com/v1beta/${geminiFileId}?key=${GEMINI_KEY}`, { method: 'DELETE' }); } catch { /* ignore */ }
+    // NÃO apaga o arquivo do Gemini: o frontend pode tentar o trecho de novo;
+    // arquivos da File API expiram sozinhos em 48h.
     return new Response(JSON.stringify({ error: msg }), { status: 500, headers: JSON_HEADERS });
   }
 });

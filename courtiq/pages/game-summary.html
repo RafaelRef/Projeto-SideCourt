@@ -70,6 +70,7 @@
   <nav class="navbar">
     <a class="navbar-logo" href="games.html">Court<span>IQ</span></a>
     <div class="navbar-actions">
+      <a class="btn btn-ghost btn-sm" id="link-ai-review" href="#" style="display:none">🤖 Revisão IA</a>
       <a class="btn btn-ghost btn-sm" href="analysis.html">Análise</a>
       <a class="btn btn-ghost btn-sm" href="scout.html">Scout</a>
       <a class="btn btn-ghost btn-sm" href="games.html">← Jogos</a>
@@ -138,6 +139,11 @@
         <button class="filter-btn" onclick="setShotFilter('made')">Certos</button>
         <button class="filter-btn" onclick="setShotFilter('missed')">Errados</button>
       </div>
+      <div class="shot-filters" id="team-filters" style="display:none">
+        <button class="filter-btn active" onclick="setShotTeam('all')">Ambos os times</button>
+        <button class="filter-btn" onclick="setShotTeam('ours')">Nosso time</button>
+        <button class="filter-btn" onclick="setShotTeam('opp')">Adversário</button>
+      </div>
       <svg class="shotchart-svg" id="game-shotchart" viewBox="0 0 560 300"></svg>
       <div class="shot-stats-row">
         <div class="shot-stat">Total: <strong id="gs-total">0</strong></div>
@@ -155,7 +161,7 @@
     import { requireAuth } from '../js/auth.js';
     import { getGame, getGamePlayers } from '../js/games.js';
     import { getGameEvents } from '../js/events.js';
-    import { calcBoxScore, calcTeamScore, calcScoreByQuarter, calcOppScoreByQuarter, calcPlayerStats } from '../js/stats.js';
+    import { calcBoxScore, calcTeamScore, calcOppScore, calcScoreByQuarter, calcOppScoreByQuarter, calcPlayerStats, isOppEvent } from '../js/stats.js';
     import { getInitials, getQueryParam, pct, formatDate } from '../js/utils.js';
     import { initShotChart, renderShots, getShotStats } from '../js/shotchart.js';
 
@@ -163,6 +169,7 @@
     let allEvents = [];
     let gamePlayersGlobal = [];
     let shotFilter = 'all';
+    let shotTeam = 'all';
     let shotChartReady = false;
 
     window.setTab = function(name) {
@@ -183,10 +190,20 @@
       renderShotChart();
     };
 
+    window.setShotTeam = function(t) {
+      shotTeam = t;
+      document.querySelectorAll('#team-filters .filter-btn').forEach((b, i) => {
+        b.classList.toggle('active', ['all','ours','opp'][i] === t);
+      });
+      renderShotChart();
+    };
+
     window.renderShotChart = function() {
       const svg = document.getElementById('game-shotchart');
       const playerFilter = document.getElementById('shots-player-select').value;
       let shots = allEvents.filter(e => e.shot_x != null);
+      if (shotTeam === 'ours') shots = shots.filter(e => !isOppEvent(e));
+      if (shotTeam === 'opp')  shots = shots.filter(e => isOppEvent(e));
       if (playerFilter !== 'all') shots = shots.filter(e => e.player_id === playerFilter);
       renderShots(svg, shots, shotFilter, null);
       const st = getShotStats(shots, playerFilter === 'all' ? null : playerFilter);
@@ -223,7 +240,20 @@
           .join('');
 
       const ourScore = game.our_score ?? calcTeamScore(events);
-      const oppScore = game.opp_score ?? null;
+      // opp_score salvo no jogo > pontos do adversário registrados em eventos (manual ou IA)
+      const oppPtsFromEvents = calcOppScore(events);
+      const oppScore = game.opp_score ?? (oppPtsFromEvents > 0 ? oppPtsFromEvents : null);
+
+      // Link para a revisão da IA quando há análise registrada
+      if (game.ai_raw || events.some(e => e.source === 'ai')) {
+        const link = document.getElementById('link-ai-review');
+        link.href = `ai-review.html?gameId=${gameId}`;
+        link.style.display = '';
+      }
+      // Filtro de time no mapa quando há arremessos do adversário
+      if (events.some(e => e.shot_x != null && isOppEvent(e))) {
+        document.getElementById('team-filters').style.display = '';
+      }
       const scoreText = oppScore != null ? `${ourScore} — ${oppScore}` : `${ourScore}`;
       const win = oppScore != null ? ourScore > oppScore : null;
       const meta = `${formatDate(game.date)} · ${game.opponent}${game.tournament ? ' · ' + game.tournament : ''}`;

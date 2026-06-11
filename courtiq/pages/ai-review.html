@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CourtIQ — Revisão da IA</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .main { padding: 1.5rem 1.25rem; max-width: 960px; margin: 0 auto; }
+
+    .review-header {
+      background: linear-gradient(135deg, var(--bg2), #141a2b);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .review-title { display:flex; align-items:center; gap:0.6rem; margin-bottom:0.25rem; }
+    .review-meta { color: var(--muted); font-size: 0.85rem; }
+
+    .score-compare {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 0.75rem;
+      margin: 1rem 0 1.25rem;
+    }
+    .score-box {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.8rem;
+      text-align: center;
+    }
+    .score-box .v { font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:1.7rem; line-height:1.1; }
+    .score-box .l { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-top:0.25rem; }
+    .score-box.ok    .v { color: var(--green); }
+    .score-box.warn  .v { color: var(--yellow); }
+
+    .review-filters { display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.85rem; }
+    .review-filters .select { width:auto; min-width:150px; padding:0.4rem 0.7rem; font-size:0.85rem; }
+
+    /* Linha de evento */
+    .ev-row {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.55rem 0.8rem;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 0.4rem;
+      flex-wrap: wrap;
+    }
+    .ev-row.discarded { opacity: 0.62; border-style: dashed; }
+    .ev-time {
+      font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:0.95rem;
+      color: var(--accent2); width: 46px; flex-shrink:0;
+    }
+    .ev-q { font-size:0.68rem; font-weight:700; color:var(--muted); width:24px; flex-shrink:0; }
+    .ev-team {
+      font-size:0.62rem; font-weight:800; letter-spacing:0.05em;
+      padding:0.12rem 0.4rem; border-radius:4px; flex-shrink:0;
+    }
+    .ev-team.ours { background: var(--accent-dim); color: #93c5fd; }
+    .ev-team.opp  { background: #3a2a10; color: var(--yellow); }
+    .ev-who { font-weight:600; font-size:0.85rem; width:130px; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .ev-type { font-size:0.82rem; width:120px; flex-shrink:0; }
+    .ev-conf { display:flex; align-items:center; gap:0.35rem; width:86px; flex-shrink:0; }
+    .conf-track { flex:1; height:5px; background:var(--bg3); border-radius:3px; overflow:hidden; }
+    .conf-fill { height:100%; border-radius:3px; }
+    .conf-num { font-size:0.68rem; color:var(--muted); width:28px; }
+    .ev-desc { flex:1; min-width:140px; font-size:0.78rem; color:var(--muted); font-style:italic; }
+    .ev-status { font-size:0.66rem; font-weight:700; flex-shrink:0; }
+    .ev-status.ok { color: var(--green); }
+    .ev-status.off { color: var(--yellow); }
+    .ev-actions { display:flex; gap:0.3rem; flex-shrink:0; }
+    .ev-assign { width:auto; font-size:0.75rem; padding:0.25rem 0.4rem; }
+
+    .chunk-divider {
+      display:flex; align-items:center; gap:0.6rem;
+      margin: 1rem 0 0.5rem; color: var(--muted); font-size: 0.74rem;
+      font-weight:700; text-transform:uppercase; letter-spacing:0.07em;
+    }
+    .chunk-divider::after { content:''; flex:1; border-top:1px solid var(--border); }
+    .chunk-divider .badge { font-size:0.6rem; }
+
+    .empty-note { text-align:center; color:var(--muted); padding:2rem 1rem; font-size:0.9rem; }
+
+    @media (max-width: 640px) {
+      .ev-who { width: 100px; }
+      .ev-desc { min-width: 100%; order: 10; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a class="navbar-logo" href="games.html">Court<span>IQ</span></a>
+    <div class="navbar-actions">
+      <a class="btn btn-ghost btn-sm" id="link-summary" href="#">Resumo do jogo</a>
+      <a class="btn btn-ghost btn-sm" href="games.html">← Jogos</a>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="review-header">
+      <div class="review-title">
+        <h2 style="margin:0">🤖 Revisão da Análise de IA</h2>
+      </div>
+      <div class="review-meta" id="review-meta">Carregando...</div>
+    </div>
+
+    <div class="score-compare" id="score-compare"></div>
+
+    <div class="review-filters">
+      <select class="select" id="f-team" onchange="renderList()">
+        <option value="all">Todos os times</option>
+        <option value="ours">Só nosso time</option>
+        <option value="opp">Só adversário</option>
+      </select>
+      <select class="select" id="f-status" onchange="renderList()">
+        <option value="all">Computados + descartados</option>
+        <option value="ok">Só computados</option>
+        <option value="off">Só descartados</option>
+      </select>
+      <button class="btn btn-danger btn-sm" id="btn-delete-all" style="margin-left:auto">Excluir todos eventos da IA</button>
+    </div>
+
+    <div id="event-list"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    import { requireAuth } from '../js/auth.js';
+    import { getGame, getGamePlayers } from '../js/games.js';
+    import { getGameEvents, deleteEvent } from '../js/events.js';
+    import { calcTeamScore, calcOppScore } from '../js/stats.js';
+    import { getQueryParam, formatDate, showToast } from '../js/utils.js';
+    import { supabase } from '../js/supabase-client.js';
+
+    const gameId = getQueryParam('gameId');
+    let game = null;
+    let roster = [];
+    let aiRaw = [];          // games.ai_raw: [{chunk,start,end,live,score_seen,events:[...]}]
+    let dbAiEvents = [];     // linhas reais inseridas (source='ai')
+
+    const TYPE_LABEL = {
+      '2pt_made':'Cesta de 2', '2pt_miss':'Errou de 2',
+      '3pt_made':'Cesta de 3', '3pt_miss':'Errou de 3',
+      'ft_made':'Lance livre ✓', 'ft_miss':'Lance livre ✗',
+      'reb_off':'Reb. ofensivo', 'reb_def':'Reb. defensivo',
+      'ast':'Assistência', 'stl':'Roubo de bola', 'blk':'Toco',
+      'to':'Erro (perda)', 'foul':'Falta',
+    };
+    const STATUS_LABEL = {
+      'ok':'✓ Computado',
+      'camisa_ilegivel':'Descartado — camisa ilegível',
+      'baixa_confianca':'Descartado — baixa confiança',
+      'camisa_fora_do_elenco':'Descartado — nº fora do elenco',
+      'tipo_invalido':'Descartado — tipo desconhecido',
+    };
+    const SHOT_TYPES = new Set(['2pt_made','2pt_miss','3pt_made','3pt_miss']);
+
+    function fmtTime(t) {
+      if (t == null) return '—';
+      const m = Math.floor(t / 60), s = Math.round(t % 60);
+      return `${m}:${String(s).padStart(2,'0')}`;
+    }
+
+    // Mesmo mapeamento usado na Edge Function (quadra 560x300, nós à esquerda).
+    function mapShotCoords(sx, sy, isOurs) {
+      const cx = Math.min(1, Math.max(0, sx)), cy = Math.min(1, Math.max(0, sy));
+      return {
+        x: Math.round((isOurs ? 12 + cy * 266 : 548 - cy * 266) * 10) / 10,
+        y: Math.round((22 + cx * 256) * 10) / 10,
+      };
+    }
+
+    function playerByJersey(j) { return roster.find(p => p.jersey_number === j) || null; }
+
+    function confColor(c) {
+      if (c >= 0.75) return 'var(--green)';
+      if (c >= 0.5)  return 'var(--yellow)';
+      return 'var(--red)';
+    }
+
+    // Casa um evento do ai_raw com a linha inserida no banco (p/ excluir).
+    function findDbEvent(raw) {
+      return dbAiEvents.find(e =>
+        !e._used &&
+        e.type === raw.type &&
+        (e.video_ts == null || raw.t == null || Math.abs(Number(e.video_ts) - raw.t) < 2)
+      ) || null;
+    }
+
+    window.renderList = function() {
+      const fTeam = document.getElementById('f-team').value;
+      const fStatus = document.getElementById('f-status').value;
+      const wrap = document.getElementById('event-list');
+
+      dbAiEvents.forEach(e => { e._used = false; });
+
+      if (!aiRaw.length) {
+        wrap.innerHTML = '<div class="empty-note">Nenhuma análise de IA registrada para este jogo ainda.<br/>Envie um vídeo na página <a href="upload.html">Análise de Vídeo</a>.</div>';
+        return;
+      }
+
+      let html = '';
+      for (const ch of aiRaw) {
+        const evs = (ch.events || []).filter(ev => {
+          if (fTeam !== 'all' && ev.team !== fTeam) return false;
+          const isOk = ev.status === 'ok';
+          if (fStatus === 'ok' && !isOk) return false;
+          if (fStatus === 'off' && isOk) return false;
+          return true;
+        });
+
+        html += `<div class="chunk-divider">
+          Trecho ${ch.chunk + 1} · ${fmtTime(ch.start)}–${fmtTime(ch.end)}
+          ${ch.live === false ? '<span class="badge badge-muted">sem jogo valendo</span>' : ''}
+          ${ch.score_seen ? `<span class="badge">placar visto: ${ch.score_seen}</span>` : ''}
+        </div>`;
+
+        if (!evs.length) {
+          html += '<div class="text-muted text-xs" style="padding:0.2rem 0.8rem">Nenhum evento neste trecho.</div>';
+          continue;
+        }
+
+        for (const ev of evs) {
+          const isOk = ev.status === 'ok';
+          const dbRow = isOk ? findDbEvent(ev) : null;
+          if (dbRow) dbRow._used = true;
+
+          const p = ev.team === 'ours' && ev.jersey != null ? playerByJersey(ev.jersey) : null;
+          const who = ev.jersey == null
+            ? '<span class="text-muted">camisa ilegível</span>'
+            : ev.team === 'ours'
+              ? `#${ev.jersey} ${p ? p.name.split(' ')[0] : '(fora do elenco)'}`
+              : `#${ev.jersey} adv.`;
+
+          const conf = typeof ev.conf === 'number' ? ev.conf : 0;
+          const canAssign = !isOk && VALID_ASSIGN.has(ev.type);
+
+          html += `<div class="ev-row ${isOk ? '' : 'discarded'}">
+            <div class="ev-time">${fmtTime(ev.t)}</div>
+            <div class="ev-q">${ev.quarter ? 'Q' + ev.quarter : '—'}</div>
+            <span class="ev-team ${ev.team}">${ev.team === 'ours' ? 'NÓS' : 'ADV'}</span>
+            <div class="ev-who">${who}</div>
+            <div class="ev-type">${TYPE_LABEL[ev.type] || ev.type}</div>
+            <div class="ev-conf">
+              <div class="conf-track"><div class="conf-fill" style="width:${Math.round(conf*100)}%;background:${confColor(conf)}"></div></div>
+              <div class="conf-num">${Math.round(conf*100)}%</div>
+            </div>
+            <div class="ev-desc">${ev.desc || ''}</div>
+            <div class="ev-status ${isOk ? 'ok' : 'off'}">${STATUS_LABEL[ev.status] || ev.status}</div>
+            <div class="ev-actions">
+              ${dbRow ? `<button class="icon-btn danger" title="Excluir este evento" onclick="removeEvent('${dbRow.id}')">✕</button>` : ''}
+              ${canAssign ? assignSelect(ev) : ''}
+            </div>
+          </div>`;
+        }
+      }
+      wrap.innerHTML = html;
+    };
+
+    const VALID_ASSIGN = new Set(Object.keys(TYPE_LABEL));
+
+    function assignSelect(ev) {
+      const opts = roster.map(p => `<option value="${p.id}">#${p.jersey_number ?? '—'} ${p.name.split(' ')[0]}</option>`).join('');
+      const payload = encodeURIComponent(JSON.stringify(ev));
+      return `<select class="select ev-assign" onchange="assignEvent(this, '${payload}')">
+        <option value="">Atribuir a…</option>${opts}
+      </select>`;
+    }
+
+    window.removeEvent = async function(id) {
+      if (!confirm('Excluir este evento das estatísticas?')) return;
+      try {
+        await deleteEvent(id);
+        dbAiEvents = dbAiEvents.filter(e => e.id !== id);
+        showToast('Evento excluído.', 'success');
+        await refreshScores();
+        renderList();
+      } catch (err) { showToast('Erro: ' + err.message, 'error'); }
+    };
+
+    window.assignEvent = async function(sel, payload) {
+      const playerId = sel.value;
+      if (!playerId) return;
+      const ev = JSON.parse(decodeURIComponent(payload));
+      try {
+        const row = {
+          game_id: gameId, type: ev.type, quarter: ev.quarter ?? null,
+          player_id: playerId, opp_jersey_number: null,
+          video_ts: ev.t ?? null, ai_confidence: ev.conf ?? null,
+          ai_desc: ev.desc ?? null, source: 'ai',
+          shot_x: null, shot_y: null,
+        };
+        if (SHOT_TYPES.has(ev.type) && typeof ev.sx === 'number' && typeof ev.sy === 'number') {
+          const { x, y } = mapShotCoords(ev.sx, ev.sy, true);
+          row.shot_x = x; row.shot_y = y;
+        }
+        const { data, error } = await supabase.from('events').insert(row).select().single();
+        if (error) throw error;
+        dbAiEvents.push(data);
+        ev.status = 'ok';
+        // persiste a correção no ai_raw
+        for (const ch of aiRaw) {
+          const idx = (ch.events || []).findIndex(e => e.t === ev.t && e.type === ev.type && e.status !== 'ok');
+          if (idx >= 0) { ch.events[idx] = { ...ch.events[idx], status: 'ok', jersey: ev.jersey, team: 'ours' }; break; }
+        }
+        await supabase.from('games').update({ ai_raw: aiRaw }).eq('id', gameId);
+        showToast('Evento atribuído!', 'success');
+        await refreshScores();
+        renderList();
+      } catch (err) { showToast('Erro: ' + err.message, 'error'); }
+    };
+
+    document.getElementById('btn-delete-all').addEventListener('click', async () => {
+      if (!confirm('Excluir TODOS os eventos criados pela IA neste jogo? As estatísticas manuais são mantidas.')) return;
+      try {
+        const { error } = await supabase.from('events').delete().eq('game_id', gameId).eq('source', 'ai');
+        if (error) throw error;
+        dbAiEvents = [];
+        showToast('Eventos da IA excluídos.', 'success');
+        await refreshScores();
+        renderList();
+      } catch (err) { showToast('Erro: ' + err.message, 'error'); }
+    });
+
+    async function refreshScores() {
+      const events = await getGameEvents(gameId);
+      const ours = calcTeamScore(events);
+      const opp = calcOppScore(events);
+
+      // último placar visto pela IA em qualquer trecho
+      let lastSeen = null;
+      for (const ch of aiRaw) if (ch.score_seen) lastSeen = ch.score_seen;
+
+      const nOk = aiRaw.reduce((n, ch) => n + (ch.events || []).filter(e => e.status === 'ok').length, 0);
+      const nOff = aiRaw.reduce((n, ch) => n + (ch.events || []).filter(e => e.status !== 'ok').length, 0);
+      const nLive = aiRaw.filter(ch => ch.live !== false).length;
+
+      document.getElementById('score-compare').innerHTML = `
+        <div class="score-box ok"><div class="v">${ours} × ${opp}</div><div class="l">Placar computado (nós × adv)</div></div>
+        <div class="score-box ${lastSeen ? '' : 'warn'}"><div class="v">${lastSeen ?? '—'}</div><div class="l">Último placar visto pela IA</div></div>
+        <div class="score-box"><div class="v">${nOk} <span style="color:var(--muted);font-size:1rem">/ ${nOk + nOff}</span></div><div class="l">Eventos computados / vistos</div></div>
+        <div class="score-box"><div class="v">${nLive} <span style="color:var(--muted);font-size:1rem">/ ${aiRaw.length}</span></div><div class="l">Trechos com jogo valendo</div></div>
+      `;
+    }
+
+    async function init() {
+      const session = await requireAuth();
+      if (!session) return;
+      if (!gameId) { window.location.href = 'games.html'; return; }
+
+      document.getElementById('link-summary').href = `game-summary.html?gameId=${gameId}`;
+
+      const [g, players, events] = await Promise.all([
+        getGame(gameId),
+        getGamePlayers(gameId),
+        getGameEvents(gameId),
+      ]);
+      if (!g) { window.location.href = 'games.html'; return; }
+
+      game = g;
+      roster = players;
+      aiRaw = Array.isArray(g.ai_raw) ? g.ai_raw : [];
+      dbAiEvents = events.filter(e => e.source === 'ai');
+
+      document.getElementById('review-meta').textContent =
+        `${formatDate(g.date)} · vs ${g.opponent} — confira abaixo cada lance que a IA identificou no vídeo, o que foi computado e o que foi descartado.`;
+      document.title = `CourtIQ — Revisão IA vs ${g.opponent}`;
+
+      await refreshScores();
+      renderList();
+    }
+
+    init();
+  </script>
+</body>
+</html>
