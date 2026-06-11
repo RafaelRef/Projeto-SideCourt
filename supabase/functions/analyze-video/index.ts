@@ -1,5 +1,24 @@
-// CourtIQ — Edge Function: analyze-video
-// Recebe gameId + storagePath, analisa com Gemini 2.0 Flash, insere eventos no banco
+// CourtIQ — Edge Function: analyze-video (v2 — análise em 2 fases)
+//
+// Por que 2 fases?
+//   Um vídeo de jogo inteiro (~40-90 min, 40-50 MB) demora ~100-110s só para o
+//   Gemini processar internamente (estado PROCESSING → ACTIVE) + ~50s para
+//   generateContent = total > 150s → WORKER_RESOURCE_LIMIT na Edge Function.
+//   A solução é separar: Fase 1 faz o upload e retorna imediatamente; o
+//   frontend aguarda e então aciona a Fase 2 quando o arquivo já está ACTIVE.
+//
+//   Fase 1 (sem geminiFileId no body):
+//     – Baixa o vídeo do Storage, faz upload para a Gemini File API.
+//     – Salva o gemini_file_id no banco e retorna { geminiFileId } com 202.
+//     – Termina em ~10s (bem dentro dos 150s).
+//
+//   Fase 2 (com geminiFileId no body):
+//     – Aguarda o arquivo virar ACTIVE (poll curto; já deve estar pronto).
+//     – Roda generateContent com Gemini 2.5 Flash (sem thinking, baixa resolução
+//       de mídia, 0.5 fps) para extrair eventos.
+//     – Insere eventos no banco, apaga o vídeo do Storage e do Gemini.
+//     – Retorna { retryLater: true } se o arquivo ainda não estiver ACTIVE.
+//
 // Deploy: supabase functions deploy analyze-video
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -10,7 +29,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Tipos de eventos válidos que a IA pode retornar
+const JSON_HEADERS = { ...corsHeaders, 'Content-Type': 'application/json' };
+
 const VALID_EVENT_TYPES = new Set([
   '2pt_made', '2pt_miss', '3pt_made', '3pt_miss',
   'ft_made', 'ft_miss',
@@ -18,10 +38,28 @@ const VALID_EVENT_TYPES = new Set([
   'ast', 'stl', 'blk', 'to', 'foul',
 ]);
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+// Parseia o JSON retornado pelo Gemini, tolerando truncamento no limite de tokens.
+function parseEvents(text: string): unknown[] {
+  try {
+    return (JSON.parse(text) as { events?: unknown[] }).events ?? [];
+  } catch {
+    // JSON truncado: recupera eventos completos até o último '}' de nível 1.
+    const arrStart = text.indexOf('[');
+    if (arrStart < 0) return [];
+    let depth = 0;
+    let lastClose = -1;
+    for (let i = arrStart; i < text.length; i++) {
+      if (text[i] === '{') depth++;
+      else if (text[i] === '}') { depth--; if (depth === 0) lastClose = i; }
+    }
+    if (lastClose < 0) return [];
+    try { return JSON.parse('[' + text.slice(arrStart + 1, lastClose + 1) + ']') as unknown[]; }
+    catch { return []; }
   }
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -31,112 +69,138 @@ serve(async (req) => {
   const GEMINI_KEY = Deno.env.get('GEMINI_API_KEY');
   if (!GEMINI_KEY) {
     return new Response(JSON.stringify({ error: 'GEMINI_API_KEY não configurada.' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500, headers: JSON_HEADERS,
     });
   }
 
-  let gameId: string, storagePath: string, players: { id: string; jersey_number: number; name: string }[];
+  let gameId: string, storagePath: string;
+  let players: { id: string; jersey_number: number; name: string }[];
+  let geminiFileId: string | null;
 
   try {
     const body = await req.json();
     gameId = body.gameId;
-    storagePath = body.storagePath;
+    storagePath = body.storagePath ?? null;
     players = body.players ?? [];
+    geminiFileId = body.geminiFileId ?? null;
   } catch {
     return new Response(JSON.stringify({ error: 'Payload inválido.' }), {
-      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400, headers: JSON_HEADERS,
     });
   }
 
-  try {
-    // 1. Baixar vídeo do Storage
-    const { data: videoData, error: dlError } = await supabase.storage
-      .from('videos')
-      .download(storagePath);
-    if (dlError) throw new Error(`Erro ao baixar vídeo: ${dlError.message}`);
+  // ── FASE 1 ────────────────────────────────────────────────────────────────
+  if (!geminiFileId) {
+    try {
+      // 1. Baixar vídeo do Storage
+      const { data: videoData, error: dlError } = await supabase.storage
+        .from('videos').download(storagePath);
+      if (dlError) throw new Error(`Erro ao baixar vídeo: ${dlError.message}`);
 
-    const videoBytes = await videoData.arrayBuffer();
-
-    // 2. Fazer upload para a API de arquivos do Gemini
-    const mimeType = storagePath.endsWith('.mov') ? 'video/quicktime' : 'video/mp4';
-    const uploadRes = await fetch(
-      `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'X-Goog-Upload-Command': 'start, upload, finalize', 'Content-Type': mimeType },
-        body: new Uint8Array(videoBytes),
-      },
-    );
-    if (!uploadRes.ok) throw new Error(`Falha no upload para Gemini: ${await uploadRes.text()}`);
-
-    const uploadJson = await uploadRes.json();
-    const fileUri = uploadJson.file?.uri;
-    const fileName = uploadJson.file?.name;
-    if (!fileUri) throw new Error('Gemini não retornou URI do arquivo.');
-
-    // 3. Aguardar o arquivo ficar pronto (estado ACTIVE)
-    let fileReady = uploadJson.file?.state === 'ACTIVE';
-    let attempts = 0;
-    while (!fileReady && attempts < 30) {
-      await new Promise(r => setTimeout(r, 10000));
-      const statusRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${GEMINI_KEY}`,
+      // 2. Upload para Gemini File API (envia Blob direto — sem copiar para memória)
+      const mimeType = storagePath.endsWith('.mov') ? 'video/quicktime' : 'video/mp4';
+      const uploadRes = await fetch(
+        `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'X-Goog-Upload-Command': 'start, upload, finalize', 'Content-Type': mimeType },
+          body: videoData,
+        },
       );
-      const statusJson = await statusRes.json();
-      fileReady = statusJson.state === 'ACTIVE';
-      attempts++;
+      if (!uploadRes.ok) throw new Error(`Falha no upload para Gemini: ${await uploadRes.text()}`);
+
+      const uploadJson = await uploadRes.json();
+      const gFileName = uploadJson.file?.name; // ex: "files/abc123"
+      if (!gFileName) throw new Error('Gemini não retornou nome do arquivo.');
+
+      // 3. Salvar gemini_file_id no banco e marcar como 'uploaded'
+      await supabase.from('games')
+        .update({ ai_status: 'uploaded', gemini_file_id: gFileName, ai_error: null })
+        .eq('id', gameId);
+
+      return new Response(
+        JSON.stringify({ phase: 1, geminiFileId: gFileName }),
+        { status: 202, headers: JSON_HEADERS },
+      );
+
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await supabase.from('games').update({ ai_status: 'error', ai_error: msg }).eq('id', gameId);
+      return new Response(JSON.stringify({ error: msg }), { status: 500, headers: JSON_HEADERS });
     }
-    if (!fileReady) throw new Error('Arquivo de vídeo não processado pelo Gemini a tempo.');
+  }
 
-    // 4. Montar prompt com elenco do time
+  // ── FASE 2 ────────────────────────────────────────────────────────────────
+  // IMPORTANTE: não há loops com sleep aqui — o IDLE_TIMEOUT da Edge Function
+  // mata a execução após 150s de I/O idle acumulado. A Fase 2 verifica o estado
+  // UMA vez: se não estiver ACTIVE retorna retryLater=true imediatamente (~1s)
+  // e o frontend aguarda + chama novamente. Quando ACTIVE, roda generateContent
+  // (~50s) e retorna. Cada invocação fica bem abaixo do limite de 150s.
+  try {
+    // 1. Verificar estado ATIVO — uma única requisição, sem sleep.
+    const fileRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/${geminiFileId}?key=${GEMINI_KEY}`,
+    );
+    const fileInfo = await fileRes.json() as Record<string, unknown>;
+    const state = (fileInfo.state as string) ?? 'PROCESSING';
+
+    if (state !== 'ACTIVE') {
+      // Arquivo ainda processando: frontend aguarda ~15s e chama novamente.
+      return new Response(
+        JSON.stringify({ retryLater: true, message: 'Vídeo ainda sendo processado pelo Gemini.' }),
+        { status: 202, headers: JSON_HEADERS },
+      );
+    }
+
+    const fileUri = fileInfo.uri as string;
+    const fileMime = (fileInfo.mimeType as string) ?? 'video/mp4';
+
+    // 2. Montar prompt
     const rosterInfo = players.length > 0
-      ? `Elenco do nosso time:\n${players.map(p => `  Camisa #${p.jersey_number} — ${p.name}`).join('\n')}`
-      : 'Elenco do nosso time: não informado (identifique por número de camisa).';
+      ? `Elenco: ${players.map(p => `#${p.jersey_number}=${p.name}`).join(', ')}`
+      : 'Elenco: não informado (identifique por número de camisa).';
 
-    const prompt = `Você é um analista de basquete especializado. Analise este vídeo de jogo de basquete universitário feminino e extraia TODOS os eventos estatísticos.
-
+    const prompt = `Analise este vídeo de basquete universitário feminino e extraia TODOS os eventos estatísticos.
 ${rosterInfo}
 
-Para CADA evento identificado, retorne um objeto JSON com os campos:
+Para cada evento retorne um objeto JSON com:
 - "team": "ours" (nosso time) ou "opp" (adversário)
-- "jersey": número da camisa (inteiro) — identifique pelo número na camiseta
-- "type": tipo do evento (veja lista abaixo)
-- "quarter": quarto (1, 2, 3 ou 4)
-- "shot_x": posição X normalizada (0.0 a 1.0) onde 0=esquerda, apenas para arremessos — null se não aplicável
-- "shot_y": posição Y normalizada (0.0 a 1.0) onde 0=topo, apenas para arremessos — null se não aplicável
+- "jersey": número da camisa (inteiro)
+- "type": tipo do evento
+- "quarter": quarto (1-4)
+- "shot_x": 0.0-1.0 (só arremessos, senão omita)
+- "shot_y": 0.0-1.0 (só arremessos, senão omita)
 
-Tipos de evento válidos:
-- Arremessos: "2pt_made", "2pt_miss", "3pt_made", "3pt_miss"
-- Lances livres: "ft_made", "ft_miss"
-- Rebotes: "reb_off" (ofensivo), "reb_def" (defensivo)
-- Outros: "ast" (assistência), "stl" (roubo de bola), "blk" (toco), "to" (erro/turnover), "foul" (falta)
+Tipos válidos: 2pt_made 2pt_miss 3pt_made 3pt_miss ft_made ft_miss reb_off reb_def ast stl blk to foul
 
-Regras importantes:
-1. Analise o vídeo inteiro, não apenas trechos.
-2. Seja preciso — só registre o que você tem certeza que aconteceu.
-3. Para identificar quem fez a assistência: é quem passou a bola antes da cesta.
-4. Rebote ofensivo: o time que errou recupera a bola. Rebote defensivo: o time adversário recupera.
-5. Se não conseguir identificar o número da camisa, pule o evento.
+Regras: só registre o que tem certeza; para assistência = quem passou antes da cesta; se não identificar a camisa pule o evento.
+Retorne SOMENTE JSON válido: {"events":[...]}`;
 
-Retorne SOMENTE um JSON válido, sem texto adicional, no formato:
-{"events": [...]}`;
-
-    // 5. Chamar Gemini 2.0 Flash com o vídeo
+    // 3. Chamar Gemini 2.5 Flash (sem thinking, resolução baixa, 0.5 fps)
     const genRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{
             parts: [
-              { fileData: { mimeType, fileUri } },
+              {
+                fileData: { mimeType: fileMime, fileUri },
+                videoMetadata: { fps: 0.5 },
+              },
               { text: prompt },
             ],
           }],
           generationConfig: {
             temperature: 0.1,
             responseMimeType: 'application/json',
+            thinkingConfig: { thinkingBudget: 0 },
+            mediaResolution: 'MEDIA_RESOLUTION_LOW',
+            // 8000 tokens ≈ 48s de geração (dentro dos 150s de limite da fn).
+            // Para um jogo completo: ~230 eventos × 35 tokens/evento.
+            // Com vídeos mais curtos (por trimestre), aumentar conforme necessário.
+            maxOutputTokens: 8000,
           },
         }),
       },
@@ -146,23 +210,15 @@ Retorne SOMENTE um JSON válido, sem texto adicional, no formato:
     const genJson = await genRes.json();
     const rawText = genJson.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
 
-    // 6. Parsear resposta
-    let analysisData: { events: unknown[] };
-    try {
-      analysisData = JSON.parse(rawText);
-    } catch {
-      throw new Error(`Resposta do Gemini não é JSON válido: ${rawText.slice(0, 200)}`);
-    }
+    // 4. Parsear resposta (tolerante a truncamento)
+    const extractedEvents = parseEvents(rawText);
 
-    const extractedEvents: unknown[] = analysisData.events ?? [];
-
-    // 7. Criar mapa camisa → player_id para o nosso time
+    // 5. Mapear camisa → player_id
     const jerseyToPlayerId: Record<number, string> = {};
     players.forEach(p => { jerseyToPlayerId[p.jersey_number] = p.id; });
 
-    // 8. Inserir eventos em lotes
+    // 6. Montar linhas de eventos
     const eventRows: Record<string, unknown>[] = [];
-
     for (const ev of extractedEvents) {
       const e = ev as Record<string, unknown>;
       const type = e.type as string;
@@ -176,51 +232,45 @@ Retorne SOMENTE um JSON válido, sem texto adicional, no formato:
       const shotY = typeof e.shot_y === 'number' ? e.shot_y : null;
 
       const row: Record<string, unknown> = {
-        game_id: gameId,
-        type,
-        quarter,
-        shot_x: shotX,
-        shot_y: shotY,
+        game_id: gameId, type, quarter,
+        shot_x: shotX, shot_y: shotY,
         source: 'ai',
+        player_id: null,        // null para eventos de adversários (player_id é nullable)
+        opp_jersey_number: null,
       };
-
       if (e.team === 'ours') {
-        const playerId = jerseyToPlayerId[jersey];
-        if (playerId) row.player_id = playerId;
-        else row.opp_jersey_number = jersey; // camisa nossa não cadastrada — salva como jersey
+        const pid = jerseyToPlayerId[jersey];
+        if (pid) row.player_id = pid;
+        else row.opp_jersey_number = jersey;
       } else {
-        // adversário
         row.opp_jersey_number = jersey;
       }
-
       eventRows.push(row);
     }
 
-    // Inserir em lotes de 100
+    // 7. Inserir em lotes de 100
     for (let i = 0; i < eventRows.length; i += 100) {
-      const batch = eventRows.slice(i, i + 100);
-      const { error: insertErr } = await supabase.from('events').insert(batch);
+      const { error: insertErr } = await supabase.from('events').insert(eventRows.slice(i, i + 100));
       if (insertErr) throw new Error(`Erro ao inserir eventos: ${insertErr.message}`);
     }
 
-    // 9. Apagar o vídeo do Storage — só precisamos das estatísticas, não do vídeo.
-    // Mantém o storage grátis (1 GB) livre ao longo da temporada.
+    // 8. Limpar: apagar vídeo do Storage + arquivo do Gemini + atualizar jogo
     await supabase.storage.from('videos').remove([storagePath]);
-
-    // 10. Atualizar status do jogo (limpa video_path, já que o vídeo foi removido)
-    await supabase.from('games').update({ ai_status: 'done', video_path: null }).eq('id', gameId);
+    await fetch(`https://generativelanguage.googleapis.com/v1beta/${geminiFileId}?key=${GEMINI_KEY}`, { method: 'DELETE' });
+    await supabase.from('games')
+      .update({ ai_status: 'done', video_path: null, gemini_file_id: null })
+      .eq('id', gameId);
 
     return new Response(
       JSON.stringify({ success: true, eventsInserted: eventRows.length }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      { headers: JSON_HEADERS },
     );
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await supabase.from('games').update({ ai_status: 'error', ai_error: msg }).eq('id', gameId);
-    return new Response(
-      JSON.stringify({ error: msg }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    );
+    // Tenta limpar o arquivo do Gemini mesmo em caso de erro
+    try { await fetch(`https://generativelanguage.googleapis.com/v1beta/${geminiFileId}?key=${GEMINI_KEY}`, { method: 'DELETE' }); } catch { /* ignore */ }
+    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: JSON_HEADERS });
   }
 });

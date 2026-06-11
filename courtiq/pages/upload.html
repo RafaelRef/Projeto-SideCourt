@@ -164,7 +164,7 @@
     import { requireAuth } from '../js/auth.js';
     import { getMyTeam, getPlayers } from '../js/team.js';
     import { getGames } from '../js/games.js';
-    import { uploadAndAnalyze, pollAnalysisStatus } from '../js/ai-analysis.js';
+    import { uploadVideo, runAnalysis, pollAnalysisStatus } from '../js/ai-analysis.js';
     import { compressVideo } from '../js/video-compress.js';
     import { getQueryParam, formatDate, showToast } from '../js/utils.js';
 
@@ -267,20 +267,38 @@
           });
         }
 
+        // Fase 1: upload para Storage + envia para Gemini (~10s)
         showProgress(true, 'Enviando vídeo...', 0);
-        await uploadAndAnalyze({
+        const { storagePath, geminiFileId } = await uploadVideo({
           gameId,
           teamId,
           file: fileToUpload,
           players: activePlayers,
           onProgress: (stage, pct) => {
-            if (stage === 'upload') {
-              showProgress(true, 'Enviando vídeo...', pct);
-            }
+            if (stage === 'upload') showProgress(true, 'Enviando vídeo...', pct);
           },
         });
 
-        // Upload concluído — iniciar polling
+        // Aguarda o Gemini processar o vídeo internamente (~100s para jogos longos)
+        showProgress(true, 'Aguardando Gemini processar vídeo...', 0);
+        await new Promise(r => setTimeout(r, 30_000));
+
+        // Fase 2: análise com retry de 15s.
+        // Cada chamada: verifica ACTIVE (1s) ou analisa (~50s) — sem sleep dentro
+        // da função. O frontend aguarda entre tentativas para não bater no
+        // IDLE_TIMEOUT da Edge Function.
+        showProgress(true, 'Analisando com IA...', 0);
+        let retried = 0;
+        while (retried < 20) {
+          const result = await runAnalysis({ gameId, storagePath, geminiFileId, players: activePlayers });
+          if (!result.retryLater) break;
+          retried++;
+          if (retried >= 20) throw new Error('Gemini não processou o vídeo a tempo. Tente novamente mais tarde.');
+          showProgress(true, `Processando vídeo no Gemini... (${retried}/20)`, Math.round(retried / 20 * 80));
+          await new Promise(r => setTimeout(r, 15_000));
+        }
+
+        // Fase 2 concluída — poll detecta 'done' ou 'error' no banco
         showProgress(false);
         showAiStatus('processing');
 
