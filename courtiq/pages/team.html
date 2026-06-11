@@ -185,16 +185,19 @@
       </div>
       <div class="control-bar">
         <button class="btn btn-ghost btn-sm" id="btn-play-animate">▶ Animar</button>
+        <button class="btn btn-ghost btn-sm" id="btn-play-preset" title="Posiciona as 5 atacantes + bola">5 em quadra</button>
+        <button class="btn btn-ghost btn-sm" id="btn-play-view">½ Meia quadra</button>
+        <button class="btn btn-ghost btn-sm" id="btn-play-png" title="Baixa o passo atual como imagem">⬇ PNG</button>
         <button class="btn btn-primary btn-sm" id="btn-save-play">Salvar</button>
         <button class="btn btn-ghost btn-sm" id="btn-delete-play" style="color:var(--red)">Excluir</button>
       </div>
 
       <div class="toolbar" id="play-toolbar">
-        <button class="tool-btn active" data-tool="select">✋ Mover</button>
+        <button class="tool-btn active" data-tool="select">✋ Mover / Curvar</button>
         <button class="tool-btn" data-tool="player">● Jogadora</button>
+        <button class="tool-btn" data-tool="defender">✕ Defensora</button>
         <button class="tool-btn" data-tool="ball">🏀 Bola</button>
-        <button class="tool-btn" data-tool="cone">▲ Defensor</button>
-        <button class="tool-btn" data-tool="move">→ Movimento</button>
+        <button class="tool-btn" data-tool="move">→ Corte</button>
         <button class="tool-btn" data-tool="pass">⇢ Passe</button>
         <button class="tool-btn" data-tool="screen">⊥ Bloqueio</button>
         <button class="tool-btn" data-tool="dribble">∿ Drible</button>
@@ -215,10 +218,12 @@
       </div>
 
       <div class="play-legend">
-        <span><span class="leg-line" style="border-color:#e2e8f0"></span> Movimento</span>
+        <span><span class="leg-line" style="border-color:#cbd5e1"></span> Corte</span>
         <span><span class="leg-line" style="border-color:#22c55e;border-style:dashed"></span> Passe</span>
-        <span><span class="leg-line" style="border-color:#f59e0b"></span> Bloqueio</span>
-        <span><span class="leg-line" style="border-color:#e2e8f0;border-style:dotted"></span> Drible</span>
+        <span><span class="leg-line" style="border-color:#f59e0b"></span> Bloqueio (barra na ponta)</span>
+        <span><span class="leg-line" style="border-color:#cbd5e1;border-style:dotted"></span> Drible</span>
+        <span>● Jogadora &nbsp; ✕ Defensora</span>
+        <span class="text-muted">Dica: no modo Mover, arraste a alça no meio da seta para curvá-la; as pontas grudam na jogadora mais próxima.</span>
       </div>
     </div>
 
@@ -551,6 +556,15 @@
       document.getElementById('btn-step-del').addEventListener('click', () => playbook.deleteStep());
       document.getElementById('btn-play-animate').addEventListener('click', () => playbook.animate());
       document.getElementById('step-note').addEventListener('input', (e) => playbook.setNote(e.target.value));
+      document.getElementById('btn-play-preset').addEventListener('click', () => playbook.presetLineup());
+      document.getElementById('btn-play-view').addEventListener('click', (e) => {
+        const half = playbook.getView() !== 'half';
+        playbook.setView(half ? 'half' : 'full');
+        e.target.textContent = half ? '▭ Quadra inteira' : '½ Meia quadra';
+      });
+      document.getElementById('btn-play-png').addEventListener('click', () => {
+        playbook.exportPng(document.getElementById('play-name').value.trim() || 'jogada');
+      });
     }
 
     function renderPlaySelect() {

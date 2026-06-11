@@ -1,69 +1,88 @@
 // CourtIQ — Shot Chart SVG interativo
 // ViewBox: 0 0 560 300 (proporção FIBA 28m x 15m)
 
-// Paleta da quadra — integrada ao design system escuro do app.
-const LINE = '#4d5a78';        // linhas gerais
-const LINE_HI = '#7c8db5';     // linhas de destaque (3pt, círculo central)
-const RIM = '#ff7a3d';         // aro
-const KEY_FILL = 'rgba(59,130,246,0.09)';   // garrafão
-const ARC_FILL = 'rgba(59,130,246,0.04)';   // área de 3pt
+// Paleta da quadra — madeira clara + áreas pintadas de azul (estilo quadra oficial).
+const LINE = '#ffffff';        // linhas da quadra
+const RIM = '#e8590c';         // aro
+const PAINT = '#2563eb';       // azul das áreas pintadas
+const PAINT_DARK = '#1d4fd7';  // tom mais escuro p/ profundidade
 
 const COURT_ELEMENTS = `
 <defs>
-  <linearGradient id="courtBg" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0" stop-color="#161b29"/>
-    <stop offset="1" stop-color="#0e1119"/>
+  <linearGradient id="woodBase" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#dfb986"/>
+    <stop offset="0.5" stop-color="#d4ab74"/>
+    <stop offset="1" stop-color="#c89e66"/>
   </linearGradient>
-  <radialGradient id="centerGlow" cx="0.5" cy="0.5" r="0.5">
-    <stop offset="0" stop-color="rgba(59,130,246,0.16)"/>
-    <stop offset="1" stop-color="rgba(59,130,246,0)"/>
-  </radialGradient>
-  <pattern id="planks" width="28" height="300" patternUnits="userSpaceOnUse">
-    <rect width="28" height="300" fill="none"/>
-    <line x1="0" y1="0" x2="0" y2="300" stroke="rgba(255,255,255,0.025)" stroke-width="1"/>
+  <pattern id="woodPlanks" width="560" height="26" patternUnits="userSpaceOnUse">
+    <rect width="560" height="26" fill="none"/>
+    <line x1="0" y1="0" x2="560" y2="0" stroke="rgba(120,80,30,0.18)" stroke-width="1"/>
+    <rect x="0" y="6" width="180" height="7" fill="rgba(255,255,255,0.045)"/>
+    <rect x="240" y="16" width="200" height="6" fill="rgba(120,80,30,0.05)"/>
   </pattern>
+  <linearGradient id="paintBlue" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="${PAINT}"/>
+    <stop offset="1" stop-color="${PAINT_DARK}"/>
+  </linearGradient>
   <filter id="dotGlow" x="-60%" y="-60%" width="220%" height="220%">
-    <feDropShadow dx="0" dy="1" stdDeviation="1.6" flood-color="#000" flood-opacity="0.55"/>
+    <feDropShadow dx="0" dy="1" stdDeviation="1.4" flood-color="#000" flood-opacity="0.45"/>
+  </filter>
+  <filter id="courtShadow" x="-5%" y="-5%" width="110%" height="110%">
+    <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.35"/>
   </filter>
 </defs>
 
-<rect width="560" height="300" rx="8" fill="url(#courtBg)"/>
-<rect width="560" height="300" rx="8" fill="url(#planks)"/>
+<!-- Piso de madeira -->
+<g filter="url(#courtShadow)">
+  <rect width="560" height="300" rx="8" fill="url(#woodBase)"/>
+  <rect width="560" height="300" rx="8" fill="url(#woodPlanks)"/>
+</g>
 
-<!-- Áreas de 3 pontos (preenchimento sutil) -->
-<path d="M 2 52 L 60 52 A 195 195 0 0 1 60 248 L 2 248 Z" fill="${ARC_FILL}"/>
-<path d="M 558 52 L 500 52 A 195 195 0 0 0 500 248 L 558 248 Z" fill="${ARC_FILL}"/>
+<!-- Garrafões pintados de azul -->
+<rect x="2" y="87" width="142" height="126" fill="url(#paintBlue)"/>
+<rect x="416" y="87" width="142" height="126" fill="url(#paintBlue)"/>
 
-<!-- Brilho central + logo -->
-<circle cx="280" cy="150" r="80" fill="url(#centerGlow)"/>
-<text x="280" y="162" text-anchor="middle" font-family="'Barlow Condensed',sans-serif" font-weight="800"
-  font-size="34" fill="rgba(255,255,255,0.05)" letter-spacing="2">COURTIQ</text>
+<!-- Círculo central azul com logo CourtIQ -->
+<circle cx="280" cy="150" r="36" fill="url(#paintBlue)" stroke="${LINE}" stroke-width="2"/>
+<text x="280" y="146" text-anchor="middle" font-family="'Barlow Condensed',sans-serif" font-weight="800"
+  font-size="17" fill="#ffffff" letter-spacing="0.5">COURT<tspan fill="#9ec2ff">IQ</tspan></text>
+<line x1="258" y1="153" x2="302" y2="153" stroke="rgba(255,255,255,0.55)" stroke-width="1"/>
+<text x="280" y="163" text-anchor="middle" font-family="'Barlow',sans-serif" font-weight="600"
+  font-size="6.5" fill="rgba(255,255,255,0.75)" letter-spacing="2.2">BASKETBALL</text>
+
+<!-- Marcas azuis das laterais (mesa/bancos) -->
+<rect x="240" y="0" width="80" height="6" fill="${PAINT}"/>
+<rect x="240" y="294" width="80" height="6" fill="${PAINT}"/>
 
 <!-- Linhas externas e central -->
-<rect x="2" y="2" width="556" height="296" rx="6" fill="none" stroke="${LINE}" stroke-width="2.4"/>
-<line x1="280" y1="2" x2="280" y2="298" stroke="${LINE}" stroke-width="1.6"/>
-<circle cx="280" cy="150" r="36" fill="none" stroke="${LINE_HI}" stroke-width="1.8"/>
-<circle cx="280" cy="150" r="3" fill="${LINE_HI}"/>
+<rect x="2" y="2" width="556" height="296" rx="4" fill="none" stroke="${LINE}" stroke-width="2.4"/>
+<line x1="280" y1="2" x2="280" y2="298" stroke="${LINE}" stroke-width="2"/>
 
 <!-- Lado esquerdo (nosso ataque) -->
-<rect x="2" y="87" width="142" height="126" fill="${KEY_FILL}" stroke="${LINE}" stroke-width="1.6"/>
-<path d="M 144 87 A 63 63 0 0 1 144 213" fill="none" stroke="${LINE}" stroke-width="1.6"/>
-<path d="M 144 213 A 63 63 0 0 1 144 87" fill="none" stroke="${LINE}" stroke-width="1.6" stroke-dasharray="5 5"/>
-<path d="M 2 52 L 60 52 A 195 195 0 0 1 60 248 L 2 248" fill="none" stroke="${LINE_HI}" stroke-width="2"/>
-<path d="M 36 127 A 23 23 0 0 1 36 173" fill="none" stroke="${LINE}" stroke-width="1.3"/>
-<rect x="2" y="133" width="6" height="34" fill="none" stroke="${LINE}" stroke-width="1.5"/>
-<line x1="25" y1="135" x2="25" y2="165" stroke="#dfe5f1" stroke-width="2.4"/>
-<circle cx="36" cy="150" r="9" fill="none" stroke="${RIM}" stroke-width="2.2"/>
+<rect x="2" y="87" width="142" height="126" fill="none" stroke="${LINE}" stroke-width="2"/>
+<path d="M 144 87 A 63 63 0 0 1 144 213" fill="none" stroke="${LINE}" stroke-width="2"/>
+<path d="M 144 213 A 63 63 0 0 1 144 87" fill="none" stroke="${LINE}" stroke-width="1.6" stroke-dasharray="6 5"/>
+<path d="M 2 52 L 60 52 A 195 195 0 0 1 60 248 L 2 248" fill="none" stroke="${LINE}" stroke-width="2.2"/>
+<path d="M 36 127 A 23 23 0 0 1 36 173" fill="none" stroke="${LINE}" stroke-width="1.5"/>
+<line x1="146" y1="98" x2="152" y2="98" stroke="${LINE}" stroke-width="1.4"/>
+<line x1="146" y1="124" x2="152" y2="124" stroke="${LINE}" stroke-width="1.4"/>
+<line x1="146" y1="176" x2="152" y2="176" stroke="${LINE}" stroke-width="1.4"/>
+<line x1="146" y1="202" x2="152" y2="202" stroke="${LINE}" stroke-width="1.4"/>
+<line x1="25" y1="135" x2="25" y2="165" stroke="${LINE}" stroke-width="2.6"/>
+<circle cx="36" cy="150" r="9" fill="none" stroke="${RIM}" stroke-width="2.4"/>
 
 <!-- Lado direito (adversário) -->
-<rect x="416" y="87" width="142" height="126" fill="${KEY_FILL}" stroke="${LINE}" stroke-width="1.6"/>
-<path d="M 416 87 A 63 63 0 0 0 416 213" fill="none" stroke="${LINE}" stroke-width="1.6"/>
-<path d="M 416 213 A 63 63 0 0 0 416 87" fill="none" stroke="${LINE}" stroke-width="1.6" stroke-dasharray="5 5"/>
-<path d="M 558 52 L 500 52 A 195 195 0 0 0 500 248 L 558 248" fill="none" stroke="${LINE_HI}" stroke-width="2"/>
-<path d="M 524 127 A 23 23 0 0 0 524 173" fill="none" stroke="${LINE}" stroke-width="1.3"/>
-<rect x="552" y="133" width="6" height="34" fill="none" stroke="${LINE}" stroke-width="1.5"/>
-<line x1="535" y1="135" x2="535" y2="165" stroke="#dfe5f1" stroke-width="2.4"/>
-<circle cx="524" cy="150" r="9" fill="none" stroke="${RIM}" stroke-width="2.2"/>
+<rect x="416" y="87" width="142" height="126" fill="none" stroke="${LINE}" stroke-width="2"/>
+<path d="M 416 87 A 63 63 0 0 0 416 213" fill="none" stroke="${LINE}" stroke-width="2"/>
+<path d="M 416 213 A 63 63 0 0 0 416 87" fill="none" stroke="${LINE}" stroke-width="1.6" stroke-dasharray="6 5"/>
+<path d="M 558 52 L 500 52 A 195 195 0 0 0 500 248 L 558 248" fill="none" stroke="${LINE}" stroke-width="2.2"/>
+<path d="M 524 127 A 23 23 0 0 0 524 173" fill="none" stroke="${LINE}" stroke-width="1.5"/>
+<line x1="408" y1="98" x2="414" y2="98" stroke="${LINE}" stroke-width="1.4"/>
+<line x1="408" y1="124" x2="414" y2="124" stroke="${LINE}" stroke-width="1.4"/>
+<line x1="408" y1="176" x2="414" y2="176" stroke="${LINE}" stroke-width="1.4"/>
+<line x1="408" y1="202" x2="414" y2="202" stroke="${LINE}" stroke-width="1.4"/>
+<line x1="535" y1="135" x2="535" y2="165" stroke="${LINE}" stroke-width="2.6"/>
+<circle cx="524" cy="150" r="9" fill="none" stroke="${RIM}" stroke-width="2.4"/>
 
 <g id="shot-layer"></g>
 `;
@@ -261,19 +280,19 @@ function makeShotDot(x, y, made, opacity, label = '') {
     circle.setAttribute('stroke-width', '1.4');
     g.appendChild(circle);
   } else {
-    // ✕ vermelho com halo escuro para legibilidade sobre as linhas
+    // ✕ vermelho com halo claro para legibilidade sobre a madeira/linhas
     const halo = document.createElementNS(NS, 'circle');
     halo.setAttribute('cx', x);
     halo.setAttribute('cy', y);
     halo.setAttribute('r', '7');
-    halo.setAttribute('fill', 'rgba(0,0,0,0.35)');
+    halo.setAttribute('fill', 'rgba(255,255,255,0.5)');
     g.appendChild(halo);
     const size = 4.6;
     [[-1, -1, 1, 1], [1, -1, -1, 1]].forEach(([a, b, c, d]) => {
       const line = document.createElementNS(NS, 'line');
       line.setAttribute('x1', x + a * size); line.setAttribute('y1', y + b * size);
       line.setAttribute('x2', x + c * size); line.setAttribute('y2', y + d * size);
-      line.setAttribute('stroke', '#f87171');
+      line.setAttribute('stroke', '#dc2626');
       line.setAttribute('stroke-width', '2.6');
       line.setAttribute('stroke-linecap', 'round');
       g.appendChild(line);

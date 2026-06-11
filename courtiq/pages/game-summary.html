@@ -97,7 +97,7 @@
           <thead>
             <tr>
               <th>Atleta</th>
-              <th>PTS</th><th>REB</th><th>AST</th><th>ROB</th><th>TOC</th><th>ERR</th><th>FAL</th><th>FG%</th><th>3P%</th><th>LL%</th>
+              <th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>ROB</th><th>TOC</th><th>ERR</th><th>FAL</th><th>FG%</th><th>3P%</th><th>LL%</th><th title="Eficiência: PTS+REB+AST+ROB+TOC − arremessos errados − lances livres errados − erros">EFF</th>
             </tr>
           </thead>
           <tbody id="boxscore-body"></tbody>
@@ -164,6 +164,7 @@
     import { calcBoxScore, calcTeamScore, calcOppScore, calcScoreByQuarter, calcOppScoreByQuarter, calcPlayerStats, isOppEvent } from '../js/stats.js';
     import { getInitials, getQueryParam, pct, formatDate } from '../js/utils.js';
     import { initShotChart, renderShots, getShotStats } from '../js/shotchart.js';
+    import { getGameStints, playedSeconds, fmtMinutes } from '../js/stints.js';
 
     const gameId = getQueryParam('gameId') || localStorage.getItem('currentGameId');
     let allEvents = [];
@@ -220,10 +221,11 @@
       if (!session) return;
       if (!gameId) { window.location.href = 'games.html'; return; }
 
-      const [game, gamePlayers, events] = await Promise.all([
+      const [game, gamePlayers, events, stints] = await Promise.all([
         getGame(gameId),
         getGamePlayers(gameId),
         getGameEvents(gameId),
+        getGameStints(gameId).catch(() => []),
       ]);
 
       if (!game) { window.location.href = 'games.html'; return; }
@@ -265,9 +267,18 @@
       document.getElementById('result-label').textContent = win === true ? 'VITÓRIA' : win === false ? 'DERROTA' : '';
       document.title = `CourtIQ — vs ${game.opponent}`;
 
-      // Box score
+      // Box score (estilo NBA: MIN + EFF de eficiência)
       const boxRows = calcBoxScore(events, gamePlayers);
       const totals = calcPlayerStats(events);
+      const eff = r => r.pts + r.reb + r.ast + r.stl + r.blk
+        - (r.fgAtt - r.fgMade) - (r.ftAtt - r.ftMade) - r.to;
+      // duração total do jogo p/ stints ainda abertos (jogo encerrado sem sub final)
+      const gameEndS = Math.max(2400, ...stints.map(s => Number(s.out_s ?? s.in_s)));
+      const minCell = pid => {
+        const s = playedSeconds(stints, pid, gameEndS);
+        return s > 0 ? fmtMinutes(s) : '—';
+      };
+      const effCell = v => `<td style="font-weight:700;color:${v >= 15 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--text)'}">${v > 0 ? '+' + v : v}</td>`;
       const tbody = document.getElementById('boxscore-body');
       tbody.innerHTML = boxRows.map(row => `
         <tr>
@@ -280,6 +291,7 @@
               </div>
             </div>
           </td>
+          <td>${minCell(row.player.id)}</td>
           <td class="num">${row.pts}</td>
           <td>${row.reb}</td>
           <td>${row.ast}</td>
@@ -290,10 +302,12 @@
           <td>${pct(row.fgMade, row.fgAtt)}</td>
           <td>${pct(row.threeMade, row.threeAtt)}</td>
           <td>${pct(row.ftMade, row.ftAtt)}</td>
+          ${effCell(eff(row))}
         </tr>
       `).join('') + `
         <tr class="totals">
           <td><strong>TOTAIS</strong></td>
+          <td>—</td>
           <td class="num">${totals.pts}</td>
           <td>${totals.reb}</td>
           <td>${totals.ast}</td>
@@ -304,6 +318,7 @@
           <td>${pct(totals.fgMade, totals.fgAtt)}</td>
           <td>${pct(totals.threeMade, totals.threeAtt)}</td>
           <td>${pct(totals.ftMade, totals.ftAtt)}</td>
+          ${effCell(eff(totals))}
         </tr>
       `;
 

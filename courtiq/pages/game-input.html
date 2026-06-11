@@ -15,73 +15,115 @@
       background: var(--bg2);
       border-bottom: 1px solid var(--border);
       z-index: 50;
-      padding: 0.6rem 1rem;
+      padding: 0.55rem 1rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.75rem;
+      gap: 1rem;
       flex-wrap: wrap;
     }
-    .game-header-info { display: flex; align-items: center; gap: 1rem; }
+    .game-header-info { display: flex; align-items: center; gap: 0.9rem; }
     .live-badge { background: #7f1d1d; color: var(--red); font-size: 0.7rem; font-weight: 700; text-transform: uppercase; padding: 0.15rem 0.5rem; border-radius: 4px; letter-spacing: 0.06em; }
-    .game-score { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.6rem; }
-    .game-vs { color: var(--muted); font-size: 0.8rem; }
-    .game-header-right { display: flex; align-items: center; gap: 0.5rem; }
-    .opp-score-ctrl { display: flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; color: var(--muted); }
-    .opp-score-ctrl button { width: 22px; height: 22px; border-radius: 4px; background: var(--bg3); border: 1px solid var(--border2); color: var(--text); font-size: 0.85rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-    .opp-score-ctrl button:hover { background: var(--border2); }
-    .opp-score-val { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 1rem; min-width: 20px; text-align: center; }
+    .game-score { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.7rem; line-height: 1.1; }
+    .game-vs { color: var(--muted); font-size: 0.78rem; }
+
+    /* Relógio */
+    .clock-block { display: flex; align-items: center; gap: 0.6rem; }
+    .clock-time {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 800;
+      font-size: 1.9rem;
+      letter-spacing: 0.04em;
+      min-width: 92px;
+      text-align: center;
+      cursor: pointer;
+      border: 1px dashed transparent;
+      border-radius: 8px;
+      padding: 0 0.3rem;
+      line-height: 1.15;
+    }
+    .clock-time:hover { border-color: var(--border2); }
+    .clock-time.running { color: var(--green); }
+    .clock-btn {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: linear-gradient(135deg,#3b82f6,#2563eb);
+      border: none; color: #fff; font-size: 1.1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 10px rgba(59,130,246,0.3);
+    }
+    .clock-btn.running { background: var(--bg3); border: 1px solid var(--border2); box-shadow: none; }
+
+    .fouls-chip { font-size: 0.72rem; color: var(--muted); text-align: center; }
+    .fouls-chip strong { font-size: 0.9rem; color: var(--text); }
+    .fouls-chip strong.bonus { color: var(--red); }
+
+    .game-header-right { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 
     /* Layout 3 colunas */
     .game-body {
       display: grid;
-      grid-template-columns: 190px 1fr 270px;
+      grid-template-columns: 215px 1fr 290px;
       gap: 0;
-      height: calc(100vh - 112px);
+      height: calc(100vh - 118px);
       overflow: hidden;
     }
 
-    /* Coluna 1 — Sidebar atletas */
+    /* Coluna 1 — atletas */
     .player-sidebar {
       background: var(--bg2);
       border-right: 1px solid var(--border);
       overflow-y: auto;
-      padding: 0.75rem 0.5rem;
+      padding: 0.65rem 0.5rem;
     }
-    .sidebar-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 0 0.5rem; margin-bottom: 0.5rem; }
+    .sidebar-title { display:flex; justify-content:space-between; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 0 0.4rem; margin: 0.5rem 0 0.35rem; }
     .sidebar-player {
       display: flex;
-      flex-direction: column;
-      padding: 0.5rem;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.42rem 0.45rem;
       border-radius: 8px;
       cursor: pointer;
       border: 1px solid transparent;
-      margin-bottom: 0.25rem;
+      margin-bottom: 0.2rem;
       transition: border-color 0.12s, background 0.12s;
     }
     .sidebar-player:hover { background: var(--bg3); }
     .sidebar-player.selected { border-color: var(--accent); background: #0f1e38; }
-    .sidebar-player-name { font-size: 0.82rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .sidebar-player-num { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 0.9rem; color: var(--accent); }
-    .sidebar-mini-stats { display: flex; gap: 0.4rem; margin-top: 0.2rem; font-size: 0.7rem; color: var(--muted); }
+    .sidebar-player.sub-out { border-color: var(--yellow); background: #2a1f05; }
+    .sp-num { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 0.95rem; color: var(--accent); width: 26px; flex-shrink: 0; }
+    .sp-info { flex: 1; min-width: 0; }
+    .sp-name { font-size: 0.8rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sp-mini { font-size: 0.64rem; color: var(--muted); }
+    .sp-mini .pf-warn { color: var(--yellow); font-weight: 700; }
+    .sp-mini .pf-out { color: var(--red); font-weight: 700; }
+    .sub-btn {
+      width: 26px; height: 26px; flex-shrink: 0;
+      border-radius: 6px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      color: var(--muted); cursor: pointer; font-size: 0.85rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .sub-btn:hover { color: var(--text); border-color: var(--accent); }
 
-    /* Coluna 2 — Botões de stat */
-    .stat-panel {
-      overflow-y: auto;
-      padding: 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-    .stat-section-title {
-      font-size: 0.72rem;
+    /* Coluna 2 — registro */
+    .stat-panel { overflow-y: auto; padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.85rem; }
+    .reg-tabs { display: flex; gap: 0.4rem; }
+    .reg-tab {
+      flex: 1;
+      padding: 0.5rem;
+      border-radius: 8px;
       font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
+      font-size: 0.85rem;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
       color: var(--muted);
-      margin-bottom: 0.4rem;
+      cursor: pointer;
     }
-    .stat-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .reg-tab.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent2); }
+    .reg-tab.opp.active { background: #3a2a10; border-color: var(--yellow); color: var(--yellow); }
+
+    .stat-section-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.35rem; }
+    .stat-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem; }
     .stat-buttons-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.4rem; }
     .selected-player-label {
       background: var(--accent-dim);
@@ -101,48 +143,66 @@
       color: var(--muted);
     }
 
-    /* Coluna 3 — Shot chart */
+    /* Camisas do adversário */
+    .opp-jerseys { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .opp-jersey {
+      min-width: 40px; height: 34px;
+      padding: 0 0.5rem;
+      border-radius: 8px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      color: var(--text);
+      font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .opp-jersey.selected { background: #3a2a10; border-color: var(--yellow); color: var(--yellow); }
+    .opp-jersey.add { color: var(--muted); font-size: 1.1rem; }
+
+    /* Coluna 3 — shot chart + feed */
     .shotchart-panel {
       background: var(--bg2);
       border-left: 1px solid var(--border);
       overflow-y: auto;
-      padding: 0.75rem;
+      padding: 0.7rem;
       display: flex;
       flex-direction: column;
-      gap: 0.6rem;
+      gap: 0.55rem;
     }
-    .sc-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-    .sc-svg { border-radius: 8px; border: 1px solid var(--border); width: 100%; }
+    .sc-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+    .sc-svg { border-radius: 8px; width: 100%; }
     .sc-filters { display: flex; gap: 0.3rem; }
-    .sc-filter-btn {
-      padding: 0.2rem 0.55rem;
-      border-radius: 5px;
-      font-size: 0.72rem;
-      font-weight: 600;
-      background: var(--bg3);
-      border: 1px solid var(--border2);
-      color: var(--muted);
-      cursor: pointer;
-    }
+    .sc-filter-btn { padding: 0.2rem 0.55rem; border-radius: 5px; font-size: 0.72rem; font-weight: 600; background: var(--bg3); border: 1px solid var(--border2); color: var(--muted); cursor: pointer; }
     .sc-filter-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent2); }
-    .sc-stats { display: flex; gap: 0.75rem; font-size: 0.75rem; }
+    .sc-stats { display: flex; gap: 0.7rem; font-size: 0.74rem; }
     .sc-stat { color: var(--muted); }
     .sc-stat strong { color: var(--text); }
 
-    /* Responsividade tablet */
-    @media (max-width: 768px) {
-      .game-body { grid-template-columns: 160px 1fr; grid-template-rows: 1fr auto; height: auto; overflow: auto; }
+    /* Play-by-play */
+    .feed { display: flex; flex-direction: column; gap: 0.25rem; }
+    .feed-row {
+      display: flex; align-items: center; gap: 0.45rem;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 0.3rem 0.5rem;
+      font-size: 0.74rem;
+    }
+    .feed-clock { font-family:'Barlow Condensed',sans-serif; font-weight: 800; color: var(--accent2); width: 64px; flex-shrink: 0; font-size: 0.78rem; }
+    .feed-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .feed-text.opp { color: var(--yellow); }
+    .feed-del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.8rem; padding: 0 0.1rem; }
+    .feed-del:hover { color: var(--red); }
+
+    /* Responsividade */
+    @media (max-width: 900px) {
+      .game-body { grid-template-columns: 185px 1fr; grid-template-rows: 1fr auto; height: auto; overflow: visible; }
       .shotchart-panel { grid-column: 1 / -1; border-left: none; border-top: 1px solid var(--border); }
     }
-
-    /* Responsividade mobile */
-    @media (max-width: 480px) {
-      .game-body { grid-template-columns: 1fr; grid-template-rows: auto; height: auto; }
-      .player-sidebar { display: none !important; }
-      #mobile-player-bar { display: block !important; }
-      .stat-buttons { grid-template-columns: 1fr 1fr; }
-      .shotchart-panel { border-left: none; border-top: 1px solid var(--border); }
-      .game-header { top: 56px; }
+    @media (max-width: 560px) {
+      .game-body { grid-template-columns: 1fr; }
+      .player-sidebar { border-right: none; border-bottom: 1px solid var(--border); max-height: 300px; }
+      .game-score { font-size: 1.4rem; }
+      .clock-time { font-size: 1.5rem; min-width: 74px; }
     }
   </style>
 </head>
@@ -151,7 +211,7 @@
     <a class="navbar-logo" href="games.html">Court<span>IQ</span></a>
   </nav>
 
-  <!-- Header fixo com placar -->
+  <!-- Header fixo: placar + relógio + faltas -->
   <div class="game-header">
     <div class="game-header-info">
       <span class="live-badge">● AO VIVO</span>
@@ -159,19 +219,21 @@
         <div class="game-vs" id="game-vs">vs —</div>
         <div class="game-score"><span id="score-our">0</span> — <span id="score-opp">0</span></div>
       </div>
-      <div class="opp-score-ctrl" title="Placar adversário">
-        <button onclick="changeOppScore(-1)">−</button>
-        <span class="opp-score-val" id="opp-label">Adv</span>
-        <button onclick="changeOppScore(1)">+</button>
-      </div>
     </div>
-    <div class="game-header-right">
+
+    <div class="clock-block">
       <div class="quarter-selector" id="quarter-selector">
         <button class="quarter-btn active" onclick="setQuarter(1)">1Q</button>
         <button class="quarter-btn" onclick="setQuarter(2)">2Q</button>
         <button class="quarter-btn" onclick="setQuarter(3)">3Q</button>
         <button class="quarter-btn" onclick="setQuarter(4)">4Q</button>
       </div>
+      <div class="clock-time" id="clock-time" title="Clique para ajustar o relógio" onclick="editClock()">10:00</div>
+      <button class="clock-btn" id="clock-btn" onclick="toggleClock()" title="Iniciar/pausar relógio">▶</button>
+    </div>
+
+    <div class="game-header-right">
+      <div class="fouls-chip">FALTAS NO QUARTO<br/><strong id="fouls-our">0</strong> nós · <strong id="fouls-opp">0</strong> adv</div>
       <button class="btn btn-danger btn-sm" id="btn-end-game">Encerrar jogo</button>
     </div>
   </div>
@@ -182,25 +244,34 @@
     <button style="margin-left:auto;font-size:0.8rem;color:var(--muted);background:none;border:none;cursor:pointer" onclick="cancelShot()">Cancelar</button>
   </div>
 
-  <!-- Select mobile de atleta (só visível em ≤480px) -->
-  <div id="mobile-player-bar" style="display:none;padding:0.5rem 0.75rem;background:var(--bg2);border-bottom:1px solid var(--border);">
-    <select id="mobile-player-select" class="select" onchange="selectPlayer(this.value)" style="font-weight:600;">
-      <option value="">Selecione a atleta...</option>
-    </select>
-  </div>
-
   <!-- Layout 3 colunas -->
   <div class="game-body">
 
-    <!-- Coluna 1: Atletas -->
+    <!-- Coluna 1: Em quadra / banco -->
     <div class="player-sidebar" id="player-sidebar">
-      <div class="sidebar-title">Selecione a atleta</div>
-      <div id="sidebar-players"></div>
+      <div class="sidebar-title"><span>Em quadra</span><span id="oncourt-count">0/5</span></div>
+      <div id="oncourt-players"></div>
+      <div class="sidebar-title" style="margin-top:0.8rem"><span>Banco</span></div>
+      <div id="bench-players"></div>
+      <div class="text-muted" style="font-size:0.64rem;padding:0.5rem 0.4rem 0">
+        ⇄ faz a substituição (minutagem automática). Toque no nome para selecionar quem recebe o evento.
+      </div>
     </div>
 
-    <!-- Coluna 2: Botões de stat -->
+    <!-- Coluna 2: Registro de eventos -->
     <div class="stat-panel">
-      <div id="selected-label" class="no-player-warn">Selecione uma atleta ao lado para registrar eventos.</div>
+      <div class="reg-tabs">
+        <button class="reg-tab active" id="reg-tab-ours" onclick="setRegMode('ours')">Nossa equipe</button>
+        <button class="reg-tab opp" id="reg-tab-opp" onclick="setRegMode('opp')">Adversário</button>
+      </div>
+
+      <div id="selected-label" class="no-player-warn">Selecione uma atleta ao lado.</div>
+
+      <!-- Camisas do adversário (só no modo adversário) -->
+      <div id="opp-jersey-box" style="display:none">
+        <div class="stat-section-title">Camisa da adversária</div>
+        <div class="opp-jerseys" id="opp-jerseys"></div>
+      </div>
 
       <!-- Arremessos -->
       <div>
@@ -231,11 +302,10 @@
         </div>
       </div>
 
-      <!-- Desfazer último evento -->
-      <button class="btn btn-ghost btn-sm" id="btn-undo" style="width:fit-content;align-self:flex-start" onclick="undoLast()">↩ Desfazer último</button>
+      <button class="btn btn-ghost btn-sm" id="btn-undo" style="width:fit-content" onclick="undoLast()">↩ Desfazer último</button>
     </div>
 
-    <!-- Coluna 3: Shot chart -->
+    <!-- Coluna 3: Shot chart + play-by-play -->
     <div class="shotchart-panel">
       <div class="sc-title">Shot chart — ao vivo</div>
       <div class="sc-filters">
@@ -250,80 +320,223 @@
         <div class="sc-stat">Errados: <strong id="sc-missed" style="color:var(--red)">0</strong></div>
         <div class="sc-stat">FG%: <strong id="sc-pct">0%</strong></div>
       </div>
+      <div class="sc-title" style="margin-top:0.4rem">Últimos lances</div>
+      <div class="feed" id="feed"></div>
     </div>
   </div>
+
+  <div class="toast" id="toast"></div>
 
   <script type="module">
     import { requireAuth } from '../js/auth.js';
     import { getGame, getGamePlayers, updateGameStatus, updateGame } from '../js/games.js';
-    import { createEvent, createOppEvent, getGameEvents, deleteEvent } from '../js/events.js';
-    import { calcPlayerStats, calcTeamScore, calcOppScore } from '../js/stats.js';
+    import { createEvent, getGameEvents, deleteEvent } from '../js/events.js';
+    import { calcPlayerStats, calcTeamScore, calcOppScore, isOppEvent } from '../js/stats.js';
+    import { getGameStints, openStint, closeStint, closeAllOpenStints, playedSeconds, fmtMinutes } from '../js/stints.js';
     import { initShotChart, activateShotMode, deactivateShotMode, addShot, renderShots, getShotStats } from '../js/shotchart.js';
-    import { getQueryParam, getInitials, showToast } from '../js/utils.js';
+    import { getQueryParam, showToast } from '../js/utils.js';
 
     const gameId = getQueryParam('gameId') || localStorage.getItem('currentGameId');
+    const QLEN = 600; // 10 min por quarto (FIBA)
+
     let game = null;
     let gamePlayers = [];
-    let selectedPlayerId = null;
-    let currentQuarter = 1;
-    let pendingEventType = null;
     let gameEvents = [];
+    let stints = [];
+    let onCourt = new Set();
+    let pendingSubOut = null;
+
+    let regMode = 'ours';           // 'ours' | 'opp'
+    let selectedPlayerId = null;    // atleta nossa selecionada
+    let selectedOppJersey = null;   // camisa adversária selecionada
+    let oppJerseys = new Set();
+
+    let currentQuarter = 1;
+    let clockRemaining = QLEN;
+    let clockRunning = false;
+    let clockTimer = null;
+
+    let pendingEventType = null;
     let scFilter = 'all';
-    let oppScore = 0;
     const svgEl = document.getElementById('sc-svg');
 
-    window.setQuarter = function(q) {
-      currentQuarter = q;
-      document.querySelectorAll('.quarter-btn').forEach((b, i) => b.classList.toggle('active', i+1 === q));
+    const TYPE_LABEL = {
+      '2pt_made':'cesta de 2','2pt_miss':'errou de 2','3pt_made':'CESTA DE 3','3pt_miss':'errou de 3',
+      'ft_made':'lance livre ✓','ft_miss':'lance livre ✗','reb_off':'reb. ofensivo','reb_def':'reb. defensivo',
+      'ast':'assistência','stl':'roubo de bola','blk':'toco','to':'erro','foul':'falta','opp_1pt':'+1 adversário',
     };
 
-    window.changeOppScore = async function(delta) {
-      if (delta > 0) {
-        // Cada ponto do adversário vira um evento com o quarto atual
-        try {
-          const ev = await createOppEvent(gameId, currentQuarter);
-          gameEvents.push(ev);
-        } catch (err) {
-          showToast('Erro ao registrar ponto adversário.', 'error');
-          return;
+    // ---------- Relógio ----------
+    function elapsed() { return (currentQuarter - 1) * QLEN + (QLEN - clockRemaining); }
+
+    function fmtClock(s) {
+      const m = Math.floor(s / 60), ss = Math.floor(s % 60);
+      return `${m}:${String(ss).padStart(2, '0')}`;
+    }
+
+    function saveClock() {
+      localStorage.setItem(`ciq_clock_${gameId}`, JSON.stringify({ q: currentQuarter, r: clockRemaining }));
+    }
+
+    function renderClock() {
+      const el = document.getElementById('clock-time');
+      el.textContent = fmtClock(clockRemaining);
+      el.classList.toggle('running', clockRunning);
+      const btn = document.getElementById('clock-btn');
+      btn.textContent = clockRunning ? '❚❚' : '▶';
+      btn.classList.toggle('running', clockRunning);
+    }
+
+    window.toggleClock = function() {
+      clockRunning = !clockRunning;
+      if (clockRunning) {
+        clockTimer = setInterval(() => {
+          clockRemaining = Math.max(0, clockRemaining - 1);
+          renderClock();
+          if (clockRemaining % 5 === 0) saveClock();
+          updateMinutes();
+          if (clockRemaining === 0) {
+            window.toggleClock();
+            showToast(`Fim do ${currentQuarter}º quarto.`, '');
+          }
+        }, 1000);
+      } else {
+        clearInterval(clockTimer);
+        saveClock();
+      }
+      renderClock();
+    };
+
+    window.editClock = function() {
+      const v = prompt('Relógio (mm:ss):', fmtClock(clockRemaining));
+      if (!v) return;
+      const m = v.match(/^(\d{1,2})[:.](\d{1,2})$/);
+      if (!m) { showToast('Formato inválido. Use mm:ss', 'error'); return; }
+      clockRemaining = Math.min(QLEN, (+m[1]) * 60 + (+m[2]));
+      saveClock(); renderClock();
+    };
+
+    window.setQuarter = function(q) {
+      if (clockRunning) window.toggleClock();
+      currentQuarter = q;
+      clockRemaining = QLEN;
+      document.querySelectorAll('.quarter-btn').forEach((b, i) => b.classList.toggle('active', i + 1 === q));
+      saveClock(); renderClock(); updateFouls();
+    };
+
+    // ---------- Substituições / minutagem ----------
+    window.subToggle = async function(pid) {
+      try {
+        if (onCourt.has(pid)) {
+          if (pendingSubOut === pid) { pendingSubOut = null; renderRoster(); return; }
+          if (onCourt.size === 5 || pendingSubOut) {
+            pendingSubOut = pid; renderRoster();
+            showToast('Agora toque ⇄ em quem entra.', '');
+            return;
+          }
+          // menos de 5 em quadra: sai direto
+          await exitCourt(pid);
+        } else {
+          if (onCourt.size >= 5) {
+            if (!pendingSubOut) { showToast('Quadra cheia: toque ⇄ em quem sai primeiro.', 'error'); return; }
+            await exitCourt(pendingSubOut);
+            pendingSubOut = null;
+          }
+          await enterCourt(pid);
+        }
+        renderRoster();
+      } catch (err) { showToast('Erro na substituição: ' + err.message, 'error'); }
+    };
+
+    async function enterCourt(pid) {
+      const st = await openStint(gameId, pid, elapsed());
+      stints.push(st);
+      onCourt.add(pid);
+    }
+
+    async function exitCourt(pid) {
+      const open = stints.find(s => s.player_id === pid && s.out_s == null);
+      if (open) {
+        await closeStint(open.id, elapsed());
+        open.out_s = elapsed();
+      }
+      onCourt.delete(pid);
+    }
+
+    // ---------- Seleção / modos ----------
+    window.setRegMode = function(m) {
+      regMode = m;
+      document.getElementById('reg-tab-ours').classList.toggle('active', m === 'ours');
+      document.getElementById('reg-tab-opp').classList.toggle('active', m === 'opp');
+      document.getElementById('opp-jersey-box').style.display = m === 'opp' ? '' : 'none';
+      updateSelectedLabel();
+    };
+
+    window.selectPlayer = function(id) {
+      selectedPlayerId = id;
+      if (regMode === 'opp') setRegMode('ours');
+      document.querySelectorAll('.sidebar-player').forEach(el => el.classList.toggle('selected', el.dataset.id === id));
+      updateSelectedLabel();
+      updateSCStats();
+    };
+
+    window.selectOppJersey = function(j) {
+      selectedOppJersey = j;
+      renderOppJerseys();
+      updateSelectedLabel();
+    };
+
+    window.addOppJersey = function() {
+      const v = prompt('Número da camisa adversária:');
+      const n = parseInt(v);
+      if (isNaN(n) || n < 0 || n > 99) return;
+      oppJerseys.add(n);
+      selectedOppJersey = n;
+      renderOppJerseys();
+      updateSelectedLabel();
+    };
+
+    function updateSelectedLabel() {
+      const el = document.getElementById('selected-label');
+      if (regMode === 'ours') {
+        const p = gamePlayers.find(p => p.id === selectedPlayerId);
+        if (p) {
+          el.className = 'selected-player-label';
+          el.textContent = `Registrando para: #${p.jersey_number ?? '—'} ${p.name}`;
+        } else {
+          el.className = 'no-player-warn';
+          el.textContent = 'Selecione uma atleta ao lado.';
         }
       } else {
-        // Desfaz o último ponto do adversário deletando o evento mais recente
-        const lastOpp = [...gameEvents].reverse().find(e => e.type === 'opp_1pt');
-        if (!lastOpp) return;
-        try {
-          await deleteEvent(lastOpp.id);
-          gameEvents.splice(gameEvents.indexOf(lastOpp), 1);
-        } catch (err) {
-          showToast('Erro ao remover ponto adversário.', 'error');
-          return;
+        if (selectedOppJersey != null) {
+          el.className = 'selected-player-label';
+          el.style.borderColor = 'var(--yellow)';
+          el.textContent = `Registrando para: adversária #${selectedOppJersey}`;
+        } else {
+          el.className = 'no-player-warn';
+          el.textContent = 'Selecione (ou adicione) a camisa da adversária acima.';
         }
       }
-      oppScore = calcOppScore(gameEvents);
-      document.getElementById('score-opp').textContent = oppScore;
-    };
+      if (regMode === 'ours') el.style.borderColor = '';
+    }
 
-    window.toggleSidebar = function() {
-      const sb = document.getElementById('player-sidebar');
-      sb.classList.toggle('expanded');
-      document.getElementById('sidebar-toggle-btn').textContent = sb.classList.contains('expanded') ? 'Atletas ▴' : 'Atletas ▾';
-    };
+    function renderOppJerseys() {
+      const box = document.getElementById('opp-jerseys');
+      const nums = [...oppJerseys].sort((a, b) => a - b);
+      box.innerHTML = nums.map(n =>
+        `<button class="opp-jersey ${n === selectedOppJersey ? 'selected' : ''}" onclick="selectOppJersey(${n})">#${n}</button>`
+      ).join('') + `<button class="opp-jersey add" onclick="addOppJersey()" title="Adicionar camisa">+</button>`;
+    }
 
-    function selectPlayer(id) {
-      selectedPlayerId = id;
-      document.querySelectorAll('.sidebar-player').forEach(el => el.classList.toggle('selected', el.dataset.id === id));
-      const mobileSelect = document.getElementById('mobile-player-select');
-      if (mobileSelect.value !== id) mobileSelect.value = id;
-      const p = gamePlayers.find(p => p.id === id);
-      if (p) {
-        document.getElementById('selected-label').className = 'selected-player-label';
-        document.getElementById('selected-label').textContent = `#${p.jersey_number ?? '—'} ${p.name}`;
-      }
-      updateSCStats();
+    // ---------- Registro de eventos ----------
+    function canRegister() {
+      if (regMode === 'ours' && !selectedPlayerId) { showToast('Selecione uma atleta primeiro.', 'error'); return false; }
+      if (regMode === 'opp' && selectedOppJersey == null) { showToast('Selecione a camisa adversária primeiro.', 'error'); return false; }
+      return true;
     }
 
     window.triggerShot = function(type) {
-      if (!selectedPlayerId) { showToast('Selecione uma atleta primeiro.', 'error'); return; }
+      if (!canRegister()) return;
       pendingEventType = type;
       document.getElementById('shot-banner').classList.add('active');
       activateShotMode(svgEl);
@@ -336,102 +549,169 @@
     };
 
     window.registerEvent = async function(type, shotX = null, shotY = null) {
-      if (!selectedPlayerId) { showToast('Selecione uma atleta primeiro.', 'error'); return; }
+      if (!canRegister()) return;
       try {
-        const ev = await createEvent(gameId, selectedPlayerId, type, currentQuarter, shotX, shotY);
+        const ev = regMode === 'ours'
+          ? await createEvent(gameId, selectedPlayerId, type, currentQuarter, shotX, shotY, 'manual', null, elapsed())
+          : await createEvent(gameId, null, type, currentQuarter, shotX, shotY, 'manual', selectedOppJersey, elapsed());
         gameEvents.push(ev);
-        updateScoreboard();
-        updateSidebarStats();
-        if (shotX != null) {
-          addShot(svgEl, ev);
-          updateSCStats();
+        afterEventChange(ev, shotX != null);
+        if (type === 'foul' && regMode === 'ours') {
+          const fls = gameEvents.filter(e => e.player_id === selectedPlayerId && e.type === 'foul').length;
+          if (fls === 4) showToast('⚠️ 4ª falta!', '');
+          if (fls >= 5) showToast('🚨 5ª falta — atleta excluída.', 'error');
         }
       } catch (err) {
-        showToast('Erro ao registrar evento.', 'error');
+        showToast('Erro ao registrar evento: ' + err.message, 'error');
       }
     };
 
     window.undoLast = async function() {
-      // Pega o último evento que não seja de adversário (os de adversário têm botão próprio)
-      const last = [...gameEvents].reverse().find(e => e.type !== 'opp_1pt');
+      const last = gameEvents[gameEvents.length - 1];
       if (!last) return;
       if (!confirm('Remover o último evento registrado?')) return;
+      await removeEvent(last.id, false);
+      showToast('Evento removido.', '');
+    };
+
+    window.removeFeedEvent = async function(id) {
+      if (!confirm('Remover este lance?')) return;
+      await removeEvent(id, false);
+    };
+
+    async function removeEvent(id, silent) {
       try {
-        await deleteEvent(last.id);
-        gameEvents.splice(gameEvents.indexOf(last), 1);
-        updateScoreboard();
-        updateSidebarStats();
-        const shots = gameEvents.filter(e => e.shot_x != null);
-        renderShots(svgEl, shots, scFilter, selectedPlayerId);
-        updateSCStats();
-        showToast('Evento removido.', '');
+        await deleteEvent(id);
+        gameEvents = gameEvents.filter(e => e.id !== id);
+        afterEventChange(null, true);
       } catch (err) {
-        showToast('Erro ao desfazer.', 'error');
+        if (!silent) showToast('Erro ao remover.', 'error');
       }
-    };
-
-    window.setSCFilter = function(f) {
-      scFilter = f;
-      document.querySelectorAll('.sc-filter-btn').forEach((b, i) => b.classList.toggle('active', ['all','made','missed'][i] === f));
-      const shots = gameEvents.filter(e => e.shot_x != null);
-      renderShots(svgEl, shots, f, selectedPlayerId);
-      updateSCStats();
-    };
-
-    function updateScoreboard() {
-      const pts = calcTeamScore(gameEvents);
-      document.getElementById('score-our').textContent = pts;
     }
 
-    function updateSidebarStats() {
+    function afterEventChange(ev, touchShots) {
+      updateScoreboard();
+      updateRosterStats();
+      updateFouls();
+      renderFeed();
+      if (touchShots) {
+        if (ev && ev.shot_x != null) addShot(svgEl, ev);
+        else {
+          const shots = gameEvents.filter(e => e.shot_x != null);
+          renderShots(svgEl, shots, scFilter, null);
+        }
+        updateSCStats();
+      }
+    }
+
+    // ---------- UI: placar / faltas / feed / roster ----------
+    function updateScoreboard() {
+      document.getElementById('score-our').textContent = calcTeamScore(gameEvents);
+      document.getElementById('score-opp').textContent = calcOppScore(gameEvents);
+    }
+
+    function updateFouls() {
+      const inQ = gameEvents.filter(e => e.type === 'foul' && (e.quarter || 1) === currentQuarter);
+      const ours = inQ.filter(e => !isOppEvent(e)).length;
+      const opp = inQ.filter(e => isOppEvent(e)).length;
+      const elOur = document.getElementById('fouls-our');
+      const elOpp = document.getElementById('fouls-opp');
+      elOur.textContent = ours; elOur.classList.toggle('bonus', ours >= 5);
+      elOpp.textContent = opp; elOpp.classList.toggle('bonus', opp >= 5);
+    }
+
+    function feedClockLabel(ev) {
+      if (ev.clock_s == null) return `Q${ev.quarter || '?'}`;
+      const q = ev.quarter || Math.floor(Number(ev.clock_s) / QLEN) + 1;
+      const rem = QLEN - (Number(ev.clock_s) - (q - 1) * QLEN);
+      return `Q${q} ${fmtClock(Math.max(0, rem))}`;
+    }
+
+    function renderFeed() {
+      const feed = document.getElementById('feed');
+      const rows = [...gameEvents].slice(-30).reverse().map(ev => {
+        const opp = isOppEvent(ev);
+        const p = ev.player_id ? gamePlayers.find(x => x.id === ev.player_id) : null;
+        const who = opp
+          ? (ev.opp_jersey_number != null ? `Adv #${ev.opp_jersey_number}` : 'Adversário')
+          : (p ? `#${p.jersey_number ?? '—'} ${p.name.split(' ')[0]}` : '—');
+        return `<div class="feed-row">
+          <span class="feed-clock">${feedClockLabel(ev)}</span>
+          <span class="feed-text ${opp ? 'opp' : ''}">${who} — ${TYPE_LABEL[ev.type] || ev.type}</span>
+          <button class="feed-del" onclick="removeFeedEvent('${ev.id}')" title="Remover">✕</button>
+        </div>`;
+      });
+      feed.innerHTML = rows.join('') || '<div class="text-muted" style="font-size:0.74rem">Nenhum lance registrado ainda.</div>';
+    }
+
+    function playerRow(p) {
+      const evs = gameEvents.filter(e => e.player_id === p.id);
+      const st = calcPlayerStats(evs);
+      const secs = playedSeconds(stints, p.id, elapsed());
+      const pfClass = st.foul >= 5 ? 'pf-out' : (st.foul >= 4 ? 'pf-warn' : '');
+      return `<div class="sidebar-player ${p.id === selectedPlayerId ? 'selected' : ''} ${p.id === pendingSubOut ? 'sub-out' : ''}" data-id="${p.id}" onclick="selectPlayer('${p.id}')">
+        <span class="sp-num">#${p.jersey_number ?? '—'}</span>
+        <div class="sp-info">
+          <div class="sp-name">${p.name.split(' ')[0]}</div>
+          <div class="sp-mini" id="mini-${p.id}">${st.pts}p ${st.reb}r ${st.ast}a · <span class="${pfClass}">${st.foul}F</span> · <span class="min-${p.id}">${fmtMinutes(secs)}</span></div>
+        </div>
+        <button class="sub-btn" onclick="event.stopPropagation(); subToggle('${p.id}')" title="Substituir">⇄</button>
+      </div>`;
+    }
+
+    function renderRoster() {
+      const court = gamePlayers.filter(p => onCourt.has(p.id));
+      const bench = gamePlayers.filter(p => !onCourt.has(p.id));
+      document.getElementById('oncourt-players').innerHTML =
+        court.map(playerRow).join('') || '<div class="text-muted" style="font-size:0.7rem;padding:0 0.4rem">Toque ⇄ no banco para escalar as titulares.</div>';
+      document.getElementById('bench-players').innerHTML = bench.map(playerRow).join('');
+      document.getElementById('oncourt-count').textContent = `${onCourt.size}/5`;
+    }
+
+    function updateRosterStats() { renderRoster(); }
+
+    function updateMinutes() {
+      // atualiza só os contadores de minutos (a cada segundo do relógio)
       gamePlayers.forEach(p => {
-        const el = document.getElementById(`mini-${p.id}`);
-        if (!el) return;
-        const evs = gameEvents.filter(e => e.player_id === p.id);
-        const st = calcPlayerStats(evs);
-        el.textContent = `${st.pts}pts ${st.reb}reb ${st.ast}ast`;
+        if (!onCourt.has(p.id)) return;
+        const el = document.querySelector(`.min-${p.id}`);
+        if (el) el.textContent = fmtMinutes(playedSeconds(stints, p.id, elapsed()));
       });
     }
 
     function updateSCStats() {
       const shots = gameEvents.filter(e => e.shot_x != null);
-      const st = getShotStats(shots, selectedPlayerId);
+      const st = getShotStats(shots, regMode === 'ours' ? selectedPlayerId : null);
       document.getElementById('sc-total').textContent = st.total;
       document.getElementById('sc-made').textContent = st.made;
       document.getElementById('sc-missed').textContent = st.missed;
       document.getElementById('sc-pct').textContent = st.pct;
     }
 
-    function renderSidebarPlayers() {
-      const el = document.getElementById('sidebar-players');
-      el.innerHTML = gamePlayers.map(p => `
-        <div class="sidebar-player" data-id="${p.id}" onclick="selectPlayer('${p.id}')">
-          <div class="flex items-center gap-1">
-            <span class="sidebar-player-num">#${p.jersey_number ?? '—'}</span>
-            <span class="sidebar-player-name">${p.name}</span>
-          </div>
-          <div class="sidebar-mini-stats" id="mini-${p.id}">0pts 0reb 0ast</div>
-        </div>
-      `).join('');
+    window.setSCFilter = function(f) {
+      scFilter = f;
+      document.querySelectorAll('.sc-filter-btn').forEach((b, i) => b.classList.toggle('active', ['all','made','missed'][i] === f));
+      renderShots(svgEl, gameEvents.filter(e => e.shot_x != null), f, null);
+      updateSCStats();
+    };
 
-      // Popular select mobile
-      const mobileSelect = document.getElementById('mobile-player-select');
-      mobileSelect.innerHTML = '<option value="">Selecione a atleta...</option>' +
-        gamePlayers.map(p => `<option value="${p.id}">#${p.jersey_number ?? '—'} ${p.name}</option>`).join('');
-    }
-
+    // ---------- Encerrar jogo ----------
     document.getElementById('btn-end-game').addEventListener('click', async () => {
       if (!confirm('Encerrar o jogo?')) return;
       try {
+        if (clockRunning) window.toggleClock();
+        await closeAllOpenStints(gameId, elapsed());
         const ourScore = calcTeamScore(gameEvents);
-        const finalOppScore = calcOppScore(gameEvents) || oppScore;
-        await updateGame(gameId, { status: 'finished', our_score: ourScore, opp_score: finalOppScore });
+        const oppScore = calcOppScore(gameEvents);
+        await updateGame(gameId, { status: 'finished', our_score: ourScore, opp_score: oppScore });
+        localStorage.removeItem(`ciq_clock_${gameId}`);
         window.location.href = `game-summary.html?gameId=${gameId}`;
       } catch (err) {
         showToast('Erro ao encerrar jogo.', 'error');
       }
     });
 
+    // ---------- Init ----------
     async function init() {
       const session = await requireAuth();
       if (!session) return;
@@ -440,49 +720,47 @@
       game = await getGame(gameId);
       if (!game) { window.location.href = 'games.html'; return; }
 
-      // Iniciar jogo se ainda agendado
-      if (game.status === 'scheduled') {
-        await updateGameStatus(gameId, 'live');
-      }
-      if (game.status === 'finished') {
-        window.location.href = `game-summary.html?gameId=${gameId}`;
-        return;
-      }
+      if (game.status === 'scheduled') await updateGameStatus(gameId, 'live');
+      if (game.status === 'finished') { window.location.href = `game-summary.html?gameId=${gameId}`; return; }
 
       document.getElementById('game-vs').textContent = `vs ${game.opponent}`;
-      document.getElementById('opp-label').textContent = game.opponent.split(' ')[0];
       document.title = `CourtIQ — vs ${game.opponent}`;
 
-      gamePlayers = await getGamePlayers(gameId);
-      gameEvents = await getGameEvents(gameId);
+      [gamePlayers, gameEvents, stints] = await Promise.all([
+        getGamePlayers(gameId),
+        getGameEvents(gameId),
+        getGameStints(gameId),
+      ]);
 
-      // Restaurar placar do adversário: prioriza eventos opp_1pt (têm info por quarto),
-      // cai no campo opp_score do banco para jogos registrados antes dessa versão
-      oppScore = calcOppScore(gameEvents) || (game.opp_score ?? 0);
-      document.getElementById('score-opp').textContent = oppScore;
+      // Restaura relógio salvo + quem está em quadra (stints abertos)
+      try {
+        const saved = JSON.parse(localStorage.getItem(`ciq_clock_${gameId}`) || 'null');
+        if (saved) { currentQuarter = saved.q; clockRemaining = saved.r; }
+      } catch {}
+      document.querySelectorAll('.quarter-btn').forEach((b, i) => b.classList.toggle('active', i + 1 === currentQuarter));
+      stints.filter(s => s.out_s == null).forEach(s => onCourt.add(s.player_id));
 
-      renderSidebarPlayers();
+      // Camisas adversárias já vistas neste jogo
+      gameEvents.forEach(e => { if (e.opp_jersey_number != null) oppJerseys.add(e.opp_jersey_number); });
+
+      renderClock();
+      renderRoster();
+      renderOppJerseys();
       updateScoreboard();
-      updateSidebarStats();
+      updateFouls();
+      renderFeed();
 
-      // Inicializar shot chart
       initShotChart(svgEl, async (x, y) => {
         document.getElementById('shot-banner').classList.remove('active');
-        await registerEvent(pendingEventType, x, y);
+        const type = pendingEventType;
         pendingEventType = null;
+        await registerEvent(type, x, y);
       });
-
-      // Renderizar arremessos existentes
-      const shots = gameEvents.filter(e => e.shot_x != null);
-      renderShots(svgEl, shots, scFilter, selectedPlayerId);
+      renderShots(svgEl, gameEvents.filter(e => e.shot_x != null), scFilter, null);
       updateSCStats();
 
-      // Selecionar primeira atleta automaticamente
-      if (gamePlayers.length > 0) selectPlayer(gamePlayers[0].id);
+      if (gamePlayers.length > 0 && !selectedPlayerId) window.selectPlayer(gamePlayers[0].id);
     }
-
-    // Expor funções ao escopo global
-    window.selectPlayer = selectPlayer;
 
     init();
   </script>

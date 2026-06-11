@@ -1,17 +1,18 @@
 import { supabase } from './supabase-client.js';
 
-export async function createEvent(gameId, playerId, type, quarter = 1, shotX = null, shotY = null, source = 'manual', oppJersey = null) {
+export async function createEvent(gameId, playerId, type, quarter = 1, shotX = null, shotY = null, source = 'manual', oppJersey = null, clockS = null) {
   const payload = { game_id: gameId, type, quarter, shot_x: shotX, shot_y: shotY, source };
   if (playerId) payload.player_id = playerId;
   if (oppJersey != null) payload.opp_jersey_number = oppJersey;
+  if (clockS != null) payload.clock_s = clockS;
   const { data, error } = await supabase.from('events').insert(payload).select().single();
   if (error) throw error;
   return data;
 }
 
 // Registra 1 ponto do adversário no quarto atual (sem player_id)
-export async function createOppEvent(gameId, quarter = 1) {
-  return createEvent(gameId, null, 'opp_1pt', quarter);
+export async function createOppEvent(gameId, quarter = 1, clockS = null) {
+  return createEvent(gameId, null, 'opp_1pt', quarter, null, null, 'manual', null, clockS);
 }
 
 // Retorna todos os eventos de adversários num jogo (player_id nulo, opp_jersey preenchido)

@@ -1,0 +1,10 @@
+# CourtIQ — Render Blueprint
+# Deploy: render.com → New → Blueprint → conectar o repo RafaelRef/Projeto-SideCourt.
+# A cada push na main o site é republicado automaticamente (sem zip manual).
+services:
+  - type: web
+    name: courtiq
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: courtiq
+    autoDeploy: true
