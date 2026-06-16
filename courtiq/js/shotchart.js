@@ -172,13 +172,14 @@ export function renderShots(svgEl, shots, filter = 'all', activePlayerId = null)
 
   filtered.forEach(s => {
     const made = s.type === '2pt_made' || s.type === '3pt_made';
+    const isOpp = s.opp_jersey_number != null;
     const isActive = !activePlayerId || s.player_id === activePlayerId;
     const opacity = isActive ? 1 : 0.3;
     const is3 = s.type.startsWith('3');
     let label = `${made ? 'Cesta' : 'Erro'} de ${is3 ? '3' : '2'}`;
-    if (s.opp_jersey_number != null) label += ` — adversário #${s.opp_jersey_number}`;
+    if (isOpp) label += ` — adversário #${s.opp_jersey_number}`;
     if (s.ai_desc) label += ` — ${s.ai_desc}`;
-    layer.appendChild(makeShotDot(s.shot_x, s.shot_y, made, opacity, label));
+    layer.appendChild(makeShotDot(s.shot_x, s.shot_y, made, opacity, label, isOpp));
   });
 }
 
@@ -191,15 +192,17 @@ export function addShot(svgEl, shot) {
   let layer = svgEl.querySelector('#shot-layer');
   if (!layer) { layer = document.createElementNS('http://www.w3.org/2000/svg', 'g'); layer.id = 'shot-layer'; svgEl.appendChild(layer); }
   const made = shot.type === '2pt_made' || shot.type === '3pt_made';
-  const dot = makeShotDot(shot.shot_x, shot.shot_y, made, 1);
+  const isOpp = shot.opp_jersey_number != null;
+  const dot = makeShotDot(shot.shot_x, shot.shot_y, made, 1, '', isOpp);
 
   // Ripple
+  const rippleColor = isOpp ? '#2563eb' : (made ? '#22c55e' : '#ef4444');
   const ripple = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
   ripple.setAttribute('cx', shot.shot_x);
   ripple.setAttribute('cy', shot.shot_y);
   ripple.setAttribute('r', '9');
   ripple.setAttribute('fill', 'none');
-  ripple.setAttribute('stroke', made ? '#22c55e' : '#ef4444');
+  ripple.setAttribute('stroke', rippleColor);
   ripple.setAttribute('stroke-width', '2');
   ripple.style.opacity = '0.8';
   layer.appendChild(ripple);
@@ -264,23 +267,28 @@ function moveCrosshair(g, x, y) {
   g.querySelector('#ch-v').setAttribute('y2', 300);
 }
 
-function makeShotDot(x, y, made, opacity, label = '') {
+// Cores por time: nosso time = verde (cesta) / vermelho (erro);
+// adversário = azul para ambos (cesta = bolinha cheia, erro = ✕).
+function makeShotDot(x, y, made, opacity, label = '', isOpp = false) {
   const NS = 'http://www.w3.org/2000/svg';
   const g = document.createElementNS(NS, 'g');
   g.style.opacity = opacity;
   g.setAttribute('filter', 'url(#dotGlow)');
+
+  const madeColor = isOpp ? '#2563eb' : '#10b981';
+  const missColor = isOpp ? '#2563eb' : '#dc2626';
 
   if (made) {
     const circle = document.createElementNS(NS, 'circle');
     circle.setAttribute('cx', x);
     circle.setAttribute('cy', y);
     circle.setAttribute('r', '6.5');
-    circle.setAttribute('fill', '#10b981');
+    circle.setAttribute('fill', madeColor);
     circle.setAttribute('stroke', 'rgba(255,255,255,0.9)');
     circle.setAttribute('stroke-width', '1.4');
     g.appendChild(circle);
   } else {
-    // ✕ vermelho com halo claro para legibilidade sobre a madeira/linhas
+    // ✕ com halo claro para legibilidade sobre a madeira/linhas
     const halo = document.createElementNS(NS, 'circle');
     halo.setAttribute('cx', x);
     halo.setAttribute('cy', y);
@@ -292,7 +300,7 @@ function makeShotDot(x, y, made, opacity, label = '') {
       const line = document.createElementNS(NS, 'line');
       line.setAttribute('x1', x + a * size); line.setAttribute('y1', y + b * size);
       line.setAttribute('x2', x + c * size); line.setAttribute('y2', y + d * size);
-      line.setAttribute('stroke', '#dc2626');
+      line.setAttribute('stroke', missColor);
       line.setAttribute('stroke-width', '2.6');
       line.setAttribute('stroke-linecap', 'round');
       g.appendChild(line);
