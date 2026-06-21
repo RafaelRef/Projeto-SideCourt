@@ -704,8 +704,10 @@
       }
     }
 
+    function displayTranscript(t) { return t.replace(/:/g, ' dois pontos'); }
+
     function onVoiceFinal(text, alternatives) {
-      document.getElementById('voice-transcript').textContent = `"${text}"`;
+      document.getElementById('voice-transcript').textContent = `"${displayTranscript(text)}"`;
       const candidates = (alternatives && alternatives.length) ? alternatives : [text];
       let cmd = null;
       for (const alt of candidates) {
@@ -731,7 +733,7 @@
       }
       recognizer = createRecognizer({
         lang: 'pt-BR',
-        onInterim: (t) => { document.getElementById('voice-transcript').textContent = t; },
+        onInterim: (t) => { document.getElementById('voice-transcript').textContent = displayTranscript(t); },
         onFinal: onVoiceFinal,
         onError: (code) => {
           const st = document.getElementById('voice-state');
