@@ -18,7 +18,8 @@ function stripAccents(s) {
 }
 function normalize(s) {
   return stripAccents(String(s || '').toLowerCase())
-    .replace(/[.,!?;:]/g, ' ')
+    .replace(/:/g, ' dois pontos ')  // a API transcreve "dois pontos" falado como ":"
+    .replace(/[.,!?;]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
